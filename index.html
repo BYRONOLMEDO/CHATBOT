@@ -1,0 +1,2158 @@
+<!DOCTYPE html>
+<html lan-g="es">
+<head>
+    
+  <meta charset="utf-8" />
+  <title>CHATBOT para uso de los CSV de Consumertec</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+
+  <!-- PapaParse para procesar CSV en el navegador -->
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+
+  <!-- Chart.js para los gráficos de la sección 7 -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <!-- jsPDF para generar el PDF de las secciones 6 y 7 -->
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+
+  <style>
+    :root{
+      --bg:#020617;
+      --card:#020617;
+      --border:#1f2937;
+      --accent:#22d3ee;
+      --accent2:#4ade80;
+      --text:#e5e7eb;
+      --muted:#9ca3af;
+    }
+    *{box-sizing:border-box;margin:0;padding:0;}
+    body{
+      min-height:100vh;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      font-family:system-ui,-apple-system,"Segoe UI",sans-serif;
+      background:radial-gradient(circle at top,#0f172a,#020617);
+      color:var(--text);
+      padding:10px;
+    }
+    .card{
+      width:min(1100px,100%);
+      max-height:96vh;
+      background:var(--card);
+      border-radius:20px;
+      border:1px solid var(--border);
+      padding:18px 20px;
+      box-shadow:0 22px 50px rgba(0,0,0,0.6);
+      display:flex;
+      flex-direction:column;
+      gap:12px;
+      overflow-y:auto;
+    }
+    h1{
+      font-size:1.7rem;
+      text-align:center;
+      margin-bottom:4px;
+    }
+    p{
+      font-size:0.9rem;
+      line-height:1.5;
+      color:var(--muted);
+      text-align:justify;
+      text-justify:inter-word;
+    }
+    .section-title{
+      font-size:1rem;
+      font-weight:600;
+      margin-bottom:4px;
+      margin-top:8px;
+    }
+    label{
+      font-size:0.85rem;
+      margin-bottom:4px;
+      display:block;
+      color:var(--muted);
+    }
+    input[type="file"]{
+      width:100%;
+      padding:8px;
+      border-radius:10px;
+      border:1px dashed var(--border);
+      background:#020617;
+      color:var(--muted);
+      font-size:0.85rem;
+    }
+    /* NUEVO: campos de texto y selects */
+    input[type="text"],
+    select{
+      width:100%;
+      padding:8px;
+      border-radius:10px;
+      border:1px solid var(--border);
+      background:#020617;
+      color:var(--text);
+      font-size:0.85rem;
+    }
+    textarea{
+      width:100%;
+      min-height:90px;
+      max-height:200px;
+      resize:vertical;
+      border-radius:10px;
+      border:1px solid var(--border);
+      background:#020617;
+      color:var(--text);
+      padding:8px 10px;
+      font-size:0.85rem;
+      line-height:1.4;
+    }
+    .row{
+      display:flex;
+      flex-wrap:wrap;
+      gap:10px;
+      margin-top:6px;
+      align-items:center;
+    }
+    .row > *{
+      flex:1 1 auto;
+    }
+    .btn{
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      padding:8px 16px;
+      border-radius:999px;
+      text-decoration:none;
+      border:none;
+      background:linear-gradient(135deg,var(--accent),var(--accent2));
+      color:#020617;
+      font-weight:600;
+      font-size:0.85rem;
+      letter-spacing:0.02em;
+      cursor:pointer;
+      transition:transform 0.1s ease, filter 0.1s ease;
+      white-space:nowrap;
+    }
+    .btn.secondary{
+      background:#111827;
+      color:var(--muted);
+      border:1px solid var(--border);
+    }
+    .btn:hover{
+      filter:brightness(1.06);
+      transform:translateY(-1px);
+    }
+    .status{
+      font-size:0.83rem;
+      color:var(--muted);
+      margin-top:4px;
+    }
+    .output-box{
+      margin-top:8px;
+      border-radius:10px;
+      border:1px solid var(--border);
+      background:#020617;
+      padding:8px 10px;
+      font-size:0.83rem;
+      line-height:1.45;
+      max-height:260px;
+      overflow:auto;
+      white-space:pre-wrap;
+    }
+    .small{
+      font-size:0.8rem;
+      color:var(--muted);
+    }
+    .mode-options{
+      display:flex;
+      flex-direction:column;
+      gap:8px;
+      margin-top:4px;
+      flex-wrap:wrap;
+    }
+    .mode-group{
+      display:flex;
+      flex-wrap:wrap;
+      gap:12px;
+    }
+    .mode-group.hidden{
+      display:none;
+    }
+    .mode-group.disabled{
+      opacity:0.3;
+      pointer-events:none;
+    }
+    .mode-options label{
+      display:flex;
+      align-items:center;
+      gap:6px;
+      cursor:pointer;
+      font-size:0.85rem;
+    }
+    .mode-options input[type="radio"]{
+      accent-color:#22d3ee;
+      width:16px;
+      height:16px;
+    }
+    /* Sección 6: más alta y scrollbar garantizado para textos largos */
+    #textOutput{
+      max-height:60vh;
+      overflow-y:auto;
+    }
+    /* NUEVO: contenedor gráfico sección 7 */
+    .chart-wrapper{
+      margin-top:8px;
+      border-radius:10px;
+      border:1px solid var(--border);
+      background:#020617;
+      padding:8px 10px;
+      height:260px;
+    }
+    #chartCanvas{
+      width:100%;
+      height:100%;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>CHATBOT para uso de los CSV de Consumertec</h1>
+    <p>
+      Este chatbot está diseñado para trabajar con archivos <strong>OUTPUT_MAP_COMPARISONS.csv</strong> y
+      otros CSV derivados de los experimentos de Consumertec. Primero se <strong>sube en la sección 1</strong>
+      el archivo CSV que se desea analizar. A partir de su estructura, en la <strong>sección 2</strong> se
+      activan los <strong>prompts internos</strong> compatibles (comparaciones, blancura, resumen general,
+      relación de RESPONSE con las demás columnas o sus variantes avanzadas). Después se ejecuta el análisis:
+      el sistema genera un <strong>resumen numérico en el navegador (sección 5)</strong> para que puedas ver
+      la foto técnica de la tabla, pero la explicación extensa de la <strong>sección 6</strong> se construye
+      exclusivamente a partir de tu <strong>prompt de la sección 3</strong> y del modo de análisis elegido,
+      sin utilizar el texto del resumen numérico.
+    </p>
+
+    <!-- Estado del motor -->
+    <div id="llmStatus" class="status small">
+      ℹ️ El análisis numérico se hace en el navegador (sección 5) sólo como referencia técnica.
+      La explicación extensa de la sección 6 se genera en un backend LLM en Hugging Face que usa
+      únicamente tu prompt de la sección 3 (sin leer el texto de la sección 5).
+    </div>
+
+    <!-- Subir CSV (SECCIÓN 1) -->
+    <div>
+      <div class="section-title">1. Subir archivo CSV</div>
+      <label for="csvInput" id="csvLabel">
+        Sube primero el CSV que quieres analizar. Según sus columnas, se activarán las opciones de análisis en la sección 2.
+      </label>
+      <input id="csvInput" type="file" accept=".csv" />
+      <div id="fileStatus" class="status">⚠️ Ningún archivo seleccionado.</div>
+    </div>
+
+    <!-- Elegir tipo de análisis + prompt interno (SECCIÓN 2) -->
+    <div>
+      <div class="section-title">2. Elegir tipo de análisis y prompt interno</div>
+      <p class="small">
+        Después de subir el CSV, se mostrarán aquí los tipos de análisis compatibles. Cada tipo activa sus
+        prompts internos. El prompt seleccionado se mostrará en la <strong>sección 3</strong> (puedes editarlo)
+        y se usará como única entrada conceptual para el LLM que genera la explicación de la
+        <strong>sección 6</strong>. La sección 5 queda como apoyo numérico visual para ti.
+      </p>
+
+      <div class="mode-options">
+        <!-- Grupo Comparaciones -->
+        <div id="group_comparaciones" class="mode-group hidden">
+          <label>
+            <input id="mode_comparaciones_basico" type="radio" name="mode"
+                   onclick="setMode('comparaciones','comparaciones_basico')" />
+            Prompt 1 — Comparación (PRODUCT_TEST vs RESPONSE)
+          </label>
+          <label>
+            <input id="mode_comparaciones_escenarios" type="radio" name="mode"
+                   onclick="setMode('comparaciones','comparaciones_escenarios')" />
+            Prompt 5 — Comparación por escenarios y modalidades
+          </label>
+        </div>
+
+        <!-- Grupo Blancura -->
+        <div id="group_whiteness" class="mode-group hidden">
+          <label>
+            <input id="mode_whiteness_basico" type="radio" name="mode"
+                   onclick="setMode('whiteness','whiteness_basico')" />
+            Prompt 2 — Blancura por MONITOR (métricas WI)
+          </label>
+          <label>
+            <input id="mode_whiteness_productos" type="radio" name="mode"
+                   onclick="setMode('whiteness','whiteness_productos')" />
+            Prompt 6 — Perfil de blancura por producto
+          </label>
+        </div>
+
+        <!-- Grupo Resumen -->
+        <div id="group_resumen" class="mode-group hidden">
+          <label>
+            <input id="mode_resumen_basico" type="radio" name="mode"
+                   onclick="setMode('resumen','resumen_basico')" />
+            Prompt 3 — Resumen general de la tabla
+          </label>
+          <label>
+            <input id="mode_resumen_avanzado" type="radio" name="mode"
+                   onclick="setMode('resumen','resumen_avanzado')" />
+            Prompt 7 — Resumen avanzado y bloques de variables
+          </label>
+        </div>
+
+        <!-- Grupo RESPONSE vs otras columnas -->
+        <div id="group_response_rel" class="mode-group hidden">
+          <label>
+            <input id="mode_response_basico" type="radio" name="mode"
+                   onclick="setMode('response_rel','response_basico')" />
+            Prompt 4 — Comparar RESPONSE con las demás columnas
+          </label>
+          <label>
+            <input id="mode_response_extremos" type="radio" name="mode"
+                   onclick="setMode('response_rel','response_extremos')" />
+            Prompt 8 — RESPONSE: mejores y peores resultados
+          </label>
+        </div>
+      </div>
+
+      <div class="status small" id="modeStatus">
+        Primero sube un CSV en la sección 1. Luego se activarán aquí los tipos de análisis compatibles.
+      </div>
+    </div>
+
+    <!-- Pregunta / Prompt (SECCIÓN 3) -->
+    <div>
+      <div class="section-title">3. Prompt de análisis</div>
+      <label for="question">
+        El prompt se rellenará automáticamente según el análisis elegido, pero puedes editarlo libremente.
+        Este texto se enviará al <strong>backend LLM</strong> como instrucción principal para generar
+        la explicación de la sección 6. La sección 5 se mantiene como resumen numérico separado,
+        que el modelo no lee directamente.
+      </label>
+      <textarea id="question" placeholder="Sube un CSV y elige un tipo de análisis; aquí aparecerá el prompt asociado, que podrás ajustar…"></textarea>
+      <div class="row">
+        <button class="btn" type="button" onclick="analizarCSV()">
+          4. Analizar CSV
+        </button>
+      </div>
+      <div id="analysisStatus" class="status">
+        ⏳ Sube un CSV, elige un tipo de análisis en la sección 2 y luego usa el botón Analizar.
+      </div>
+    </div>
+
+    <!-- Resultados de cómputo -->
+    <div>
+      <div class="section-title">5. Resultados numéricos (resumen técnico)</div>
+      <div id="numericOutput" class="output-box small">
+        // Aquí aparecerán tablas de conteos, máximos por producto, etc. (cálculo interno en el navegador).
+      </div>
+    </div>
+
+    <!-- Explicación en texto continuo -->
+    <div>
+      <div class="section-title">6. Explicación en texto continuo (respuesta extendida)</div>
+      <div id="textOutput" class="output-box">
+        // Aquí se generará una explicación automática extensa producida por el LLM, usando únicamente tu prompt de análisis (la sección 5 queda como referencia numérica aparte).
+      </div>
+
+      <!-- NUEVO: título para el PDF + botón de descarga -->
+      <div class="row">
+        <div>
+          <label for="reportTitle" class="small">
+            Título del reporte (se usará como título en el PDF y en el nombre del archivo)
+          </label>
+          <input id="reportTitle"
+                 type="text"
+                 placeholder="Ejemplo: Informe de desempeño de productos Consumertec" />
+        </div>
+        <div style="flex:0 0 auto;">
+          <button class="btn secondary" type="button" onclick="descargarPDF()">
+            Descargar secciones 6 y 7 (.pdf)
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- NUEVA SECCIÓN 7: gráficos a partir del resumen numérico -->
+    <div>
+      <div class="section-title">7. Visualización gráfica de los resultados</div>
+      <p class="small">
+        Estos gráficos se generan automáticamente a partir del resumen numérico de la sección 5.
+        Después de ejecutar un análisis, puedes elegir si ver el gráfico en barras o en líneas.
+        El LLM no usa estos gráficos; son una ayuda visual para interpretar los resultados.
+      </p>
+      <div class="row">
+        <div>
+          <label for="chartType">Tipo de gráfico</label>
+          <select id="chartType" onchange="cambiarTipoGrafico()">
+            <option value="bar">Barras</option>
+            <option value="line">Líneas</option>
+          </select>
+        </div>
+        <div id="chartStatus" class="status">
+          ⚠️ Aún no hay datos para graficar. Ejecuta un análisis primero.
+        </div>
+      </div>
+      <div class="chart-wrapper">
+        <canvas id="chartCanvas"></canvas>
+      </div>
+        <!-- NUEVO: segundo gráfico multivariable -->
+      <div id="chartMultiStatus" class="status">
+        ⚠️ Aún no hay datos para el gráfico multivariable. Ejecuta un análisis compatible (por ejemplo, Comparaciones).
+      </div>
+      <div class="chart-wrapper">
+        <canvas id="chartCanvasMulti"></canvas>
+      </div>
+    </div>
+  </div>
+  <!-- Lógica: CSV + análisis interno + LLM + gráficos + PDF -->
+  <script>
+    // ============================================================
+    //  Backend LLM (FastAPI en Hugging Face) para sección 6
+    // ============================================================
+    const BACKEND_URL = "https://alexacido-consumetec-llm.hf.space/generate_answer";
+
+    // -------------------------------------------------------------
+    // Estado global
+    // -------------------------------------------------------------
+    let csvFile = null;
+    let csvHeaders = null;
+    let analysisMode = null;       // 'comparaciones', 'whiteness', 'resumen', 'response_rel'
+    let currentPromptKey = null;   // identifica el prompt específico
+
+    // NUEVO: estado gráfico (sección 7)
+    let chartInstance = null;
+    let lastChartData = null;      // { labels, values, datasetLabel, title, xLabel, yLabel }
+       // NUEVO: estado para gráfico multivariable (sección 7)
+    let chartInstanceMulti = null;
+    let lastChartDataMulti = null; // { labels, datasets: [{label, values}], title, xLabel, yLabel }
+
+    // Tipos de análisis detectados como compatibles
+    const tiposDisponibles = {
+      comparaciones: false,
+      whiteness: false,
+      resumen: false,
+      response_rel: false
+    };
+
+    const whitenessMetrics = [
+      "1.2.WI_STw",
+      "2.2.WI_GEw",
+      "3.2.WI_VOw",
+      "4.2.WI_LGw"
+    ];
+
+    const csvInputEl   = document.getElementById("csvInput");
+    const fileStatusEl = document.getElementById("fileStatus");
+    const csvLabelEl   = document.getElementById("csvLabel");
+    const modeStatusEl = document.getElementById("modeStatus");
+
+    // -------------------------------------------------------------
+    // Helpers para sección 7 (gráficos)
+    // -------------------------------------------------------------
+    function prepararDatosGrafico(data) {
+      lastChartData = data || null;
+      const chartStatusEl = document.getElementById("chartStatus");
+      if (!lastChartData || !lastChartData.labels || !lastChartData.labels.length) {
+        if (chartStatusEl) {
+          chartStatusEl.textContent = "⚠️ No se generaron datos suficientes para graficar.";
+        }
+        if (chartInstance) {
+          chartInstance.destroy();
+          chartInstance = null;
+        }
+        return;
+      }
+      if (chartStatusEl) {
+        chartStatusEl.textContent = "✅ Datos listos para graficar: " +
+          (lastChartData.title || "gráfico a partir del resumen numérico.");
+      }
+      renderChartInternal();
+    }
+
+    function renderChartInternal() {
+      const canvas = document.getElementById("chartCanvas");
+      const chartTypeEl = document.getElementById("chartType");
+      const chartStatusEl = document.getElementById("chartStatus");
+
+      if (!canvas || !lastChartData || !lastChartData.labels || !lastChartData.labels.length) {
+        if (chartStatusEl) {
+          chartStatusEl.textContent = "⚠️ Aún no hay datos para graficar. Ejecuta un análisis primero.";
+        }
+        return;
+      }
+
+      const ctx = canvas.getContext("2d");
+      if (chartInstance) {
+        chartInstance.destroy();
+        chartInstance = null;
+      }
+
+      const tipo = chartTypeEl ? chartTypeEl.value : "bar";
+
+      chartInstance = new Chart(ctx, {
+        type: tipo,
+        data: {
+          labels: lastChartData.labels,
+          datasets: [{
+            label: lastChartData.datasetLabel || "Valores",
+            data: lastChartData.values,
+            fill: false
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: true },
+            title: {
+              display: !!lastChartData.title,
+              text: lastChartData.title
+            }
+          },
+          scales: {
+            x: {
+              title: {
+                display: !!lastChartData.xLabel,
+                text: lastChartData.xLabel
+              },
+              ticks: {
+                autoSkip: true,
+                maxRotation: 45,
+                minRotation: 0
+              }
+            },
+            y: {
+              beginAtZero: true,
+              title: {
+                display: !!lastChartData.yLabel,
+                text: lastChartData.yLabel
+              }
+            }
+          }
+        }
+      });
+
+      if (chartStatusEl) {
+        chartStatusEl.textContent = "✅ Gráfico actualizado correctamente.";
+      }
+    }
+
+    function cambiarTipoGrafico() {
+      renderChartInternal();
+    }
+    window.cambiarTipoGrafico = cambiarTipoGrafico;
+       // -------------------------------------------------------------
+    // Helpers para gráfico multivariable (segundo gráfico)
+    // -------------------------------------------------------------
+    function prepararDatosGraficoMultivariable(data) {
+      lastChartDataMulti = data || null;
+      const chartMultiStatusEl = document.getElementById("chartMultiStatus");
+
+      if (!lastChartDataMulti ||
+          !lastChartDataMulti.labels ||
+          !lastChartDataMulti.labels.length ||
+          !lastChartDataMulti.datasets ||
+          !lastChartDataMulti.datasets.length) {
+        if (chartMultiStatusEl) {
+          chartMultiStatusEl.textContent =
+            "⚠️ No se generaron datos suficientes para el gráfico multivariable.";
+        }
+        if (chartInstanceMulti) {
+          chartInstanceMulti.destroy();
+          chartInstanceMulti = null;
+        }
+        return;
+      }
+
+      if (chartMultiStatusEl) {
+        chartMultiStatusEl.textContent =
+          "✅ Datos listos para el gráfico multivariable: " +
+          (lastChartDataMulti.title || "gráfico multivariable a partir del resumen numérico.");
+      }
+
+      renderChartMultivariable();
+    }
+
+    function renderChartMultivariable() {
+      const canvas = document.getElementById("chartCanvasMulti");
+      const chartMultiStatusEl = document.getElementById("chartMultiStatus");
+
+      if (!canvas ||
+          !lastChartDataMulti ||
+          !lastChartDataMulti.labels ||
+          !lastChartDataMulti.labels.length ||
+          !lastChartDataMulti.datasets ||
+          !lastChartDataMulti.datasets.length) {
+        if (chartMultiStatusEl) {
+          chartMultiStatusEl.textContent =
+            "⚠️ Aún no hay datos para el gráfico multivariable.";
+        }
+        return;
+      }
+
+      const ctx = canvas.getContext("2d");
+      if (chartInstanceMulti) {
+        chartInstanceMulti.destroy();
+        chartInstanceMulti = null;
+      }
+
+      // Para el multivariable dejamos el tipo fijo en 'bar' (barras agrupadas)
+      chartInstanceMulti = new Chart(ctx, {
+        type: "bar",
+        data: {
+          labels: lastChartDataMulti.labels,
+          datasets: lastChartDataMulti.datasets.map(ds => ({
+            label: ds.label,
+            data: ds.values,
+            fill: false
+          }))
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: true },
+            title: {
+              display: !!lastChartDataMulti.title,
+              text: lastChartDataMulti.title
+            }
+          },
+          scales: {
+            x: {
+              title: {
+                display: !!lastChartDataMulti.xLabel,
+                text: lastChartDataMulti.xLabel
+              },
+              ticks: {
+                autoSkip: true,
+                maxRotation: 45,
+                minRotation: 0
+              }
+            },
+            y: {
+              beginAtZero: true,
+              title: {
+                display: !!lastChartDataMulti.yLabel,
+                text: lastChartDataMulti.yLabel
+              }
+            }
+          }
+        }
+      });
+
+      if (chartMultiStatusEl) {
+        chartMultiStatusEl.textContent = "✅ Gráfico multivariable actualizado correctamente.";
+      }
+    }
+
+    // -------------------------------------------------------------
+    // Actualizar visibilidad de grupos de prompts
+    // -------------------------------------------------------------
+    function actualizarDisponibilidadPrompts() {
+      const groupCompar = document.getElementById("group_comparaciones");
+      const groupWhite  = document.getElementById("group_whiteness");
+      const groupRes    = document.getElementById("group_resumen");
+      const groupResp   = document.getElementById("group_response_rel");
+
+      if (tiposDisponibles.comparaciones) groupCompar.classList.remove("hidden");
+      else groupCompar.classList.add("hidden");
+
+      if (tiposDisponibles.whiteness) groupWhite.classList.remove("hidden");
+      else groupWhite.classList.add("hidden");
+
+      if (tiposDisponibles.resumen) groupRes.classList.remove("hidden");
+      else groupRes.classList.add("hidden");
+
+      if (tiposDisponibles.response_rel) groupResp.classList.remove("hidden");
+      else groupResp.classList.add("hidden");
+
+      const activos = [];
+      if (tiposDisponibles.comparaciones) activos.push("Comparaciones PRODUCT_TEST vs RESPONSE");
+      if (tiposDisponibles.whiteness)     activos.push("Blancura por MONITOR (métricas WI)");
+      if (tiposDisponibles.resumen)      activos.push("Resumen general / avanzado");
+      if (tiposDisponibles.response_rel) activos.push("RESPONSE vs otras columnas");
+
+      if (!csvFile) {
+        modeStatusEl.textContent =
+          "Primero sube un CSV en la sección 1. Luego se activarán aquí los tipos de análisis compatibles.";
+      } else if (!activos.length) {
+        modeStatusEl.textContent =
+          "CSV cargado, pero no se detectó ninguna configuración estándar. Puedes seguir usando un resumen general con el modo Resumen.";
+      } else {
+        modeStatusEl.textContent =
+          "CSV cargado. Análisis disponibles: " + activos.join(" • ") +
+          ". La sección 5 mostrará el resumen numérico y la 6 la interpretación generada con tu prompt.";
+      }
+    }
+
+    // Inicial
+    actualizarDisponibilidadPrompts();
+
+    // -------------------------------------------------------------
+    // Manejo de subida de archivo (detecta tipos compatibles)
+    // -------------------------------------------------------------
+    csvInputEl.addEventListener("change", (ev) => {
+      const file = ev.target.files && ev.target.files[0];
+
+      // Reset al cambiar de CSV
+      csvFile = null;
+      csvHeaders = null;
+      analysisMode = null;
+      currentPromptKey = null;
+      document.querySelectorAll('input[name="mode"]').forEach(r => { r.checked = false; });
+
+      const questionEl = document.getElementById("question");
+      questionEl.value = "";
+      questionEl.placeholder =
+        "Tras subir el CSV y elegir un tipo de análisis en la sección 2, aquí se cargará el prompt correspondiente…";
+
+      // Reset gráfico
+      lastChartData = null;
+      if (chartInstance) {
+        chartInstance.destroy();
+        chartInstance = null;
+      }
+      const chartStatusEl = document.getElementById("chartStatus");
+      if (chartStatusEl) {
+        chartStatusEl.textContent = "⚠️ Aún no hay datos para graficar. Ejecuta un análisis primero.";
+      }
+         // NUEVO: reset gráfico multivariable
+      lastChartDataMulti = null;
+      if (chartInstanceMulti) {
+        chartInstanceMulti.destroy();
+        chartInstanceMulti = null;
+      }
+      const chartMultiStatusEl = document.getElementById("chartMultiStatus");
+      if (chartMultiStatusEl) {
+        chartMultiStatusEl.textContent =
+          "⚠️ Aún no hay datos para el gráfico multivariable. Ejecuta un análisis compatible (por ejemplo, Comparaciones).";
+      }
+
+      if (!file) {
+        fileStatusEl.textContent = "⚠️ Ningún archivo seleccionado.";
+        tiposDisponibles.comparaciones = false;
+        tiposDisponibles.whiteness = false;
+        tiposDisponibles.resumen = false;
+        tiposDisponibles.response_rel = false;
+        actualizarDisponibilidadPrompts();
+        return;
+      }
+
+      fileStatusEl.textContent =
+        "⏳ Leyendo archivo: " + file.name + " (" + formatBytes(file.size) + ")…";
+
+      Papa.parse(file, {
+        header: true,
+        preview: 5,
+        skipEmptyLines: true,
+        complete: function(results) {
+          const headers = results.meta && results.meta.fields ? results.meta.fields : [];
+          csvHeaders = headers;
+
+          const validCompar   = validarHeadersPorModo("comparaciones", headers);
+          const validWhite    = validarHeadersPorModo("whiteness", headers);
+          const validResumen  = validarHeadersPorModo("resumen", headers);
+          const validRespRel  = validarHeadersPorModo("response_rel", headers);
+
+          tiposDisponibles.comparaciones = !!validCompar.ok;
+          tiposDisponibles.whiteness     = !!validWhite.ok;
+          tiposDisponibles.resumen       = !!validResumen.ok;
+          tiposDisponibles.response_rel  = !!validRespRel.ok;
+
+          csvFile = file;
+
+          const disponibles = [];
+          if (validCompar.ok)  disponibles.push("Comparación PRODUCT_TEST vs RESPONSE");
+          if (validWhite.ok)   disponibles.push("Blancura por MONITOR (métricas WI)");
+          if (validRespRel.ok) disponibles.push("RESPONSE vs otras columnas");
+          if (validResumen.ok) disponibles.push("Resumen general / avanzado");
+
+          fileStatusEl.textContent =
+            "✅ CSV cargado: " + file.name + " (" + formatBytes(file.size) + "). " +
+            (disponibles.length
+              ? "Análisis posibles: " + disponibles.join(" • ") + "."
+              : "Puedes usar un resumen general con el modo Resumen.");
+
+          csvLabelEl.textContent =
+            "Archivo CSV cargado. Si lo deseas, puedes cambiarlo por otro. Ahora elige en la sección 2 el tipo de análisis.";
+
+          actualizarDisponibilidadPrompts();
+        },
+        error: function(err) {
+          csvFile = null;
+          csvHeaders = null;
+          fileStatusEl.textContent = "❌ Error al leer el CSV: " + err;
+          tiposDisponibles.comparaciones = false;
+          tiposDisponibles.whiteness = false;
+          tiposDisponibles.resumen = false;
+          tiposDisponibles.response_rel = false;
+          actualizarDisponibilidadPrompts();
+        }
+      });
+    });
+
+    function formatBytes(bytes) {
+      if (bytes === 0) return "0 B";
+      const k = 1024;
+      const sizes = ["B","KB","MB","GB","TB"];
+      const i = Math.floor(Math.log(bytes) / Math.log(k));
+      return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
+    }
+
+    // -------------------------------------------------------------
+    // Validación de columnas según modo
+    // -------------------------------------------------------------
+    function validarHeadersPorModo(mode, headers) {
+      const hdr = headers || [];
+      const set = new Set(hdr);
+
+      if (mode === "comparaciones") {
+        const needed = ["PRODUCT_TEST", "RESPONSE"];
+        const faltantes = needed.filter(c => !set.has(c));
+        if (faltantes.length > 0) {
+          return {
+            ok: false,
+            mensaje: "faltan columnas requeridas (" + faltantes.join(", ") +
+                     "). Revisa que sea el CSV de comparaciones (PRODUCT_TEST / RESPONSE)."
+          };
+        }
+        return { ok: true, mensaje: "" };
+      }
+
+      if (mode === "whiteness") {
+        const base = ["MONITOR", "PRODUCT"];
+        const faltantesBase = base.filter(c => !set.has(c));
+        if (faltantesBase.length > 0) {
+          return {
+            ok: false,
+            mensaje: "faltan columnas base " + faltantesBase.join(", ") +
+                     " para análisis de blancura (MONITOR / PRODUCT)."
+          };
+        }
+        const algunaMetrica = whitenessMetrics.some(m => set.has(m));
+        if (!algunaMetrica) {
+          return {
+            ok: false,
+            mensaje: "no se encontró ninguna de las métricas de blancura esperadas: " +
+                     whitenessMetrics.join(", ") + "."
+          };
+        }
+        return { ok: true, mensaje: "" };
+      }
+
+      if (mode === "resumen") {
+        if (!hdr.length) {
+          return { ok: false, mensaje: "el CSV no tiene columnas detectables." };
+        }
+        return { ok: true, mensaje: "" };
+      }
+
+      if (mode === "response_rel") {
+        if (!set.has("RESPONSE")) {
+          return {
+            ok: false,
+            mensaje: "no se encuentra la columna RESPONSE, necesaria para este análisis."
+          };
+        }
+        return { ok: true, mensaje: "" };
+      }
+
+      return { ok: false, mensaje: "modo de análisis no reconocido." };
+    }
+
+    // -------------------------------------------------------------
+    // Selección de prompt interno (sección 2)
+    // -------------------------------------------------------------
+    function setModeInternal(mode, promptKey) {
+      const llmStatusEl = document.getElementById("llmStatus");
+      const questionEl  = document.getElementById("question");
+
+      if (!csvFile) {
+        modeStatusEl.textContent =
+          "⚠️ Primero sube un CSV en la sección 1. Después podrás elegir el tipo de análisis.";
+        document.querySelectorAll('input[name="mode"]').forEach(r => { r.checked = false; });
+        return;
+      }
+
+      if (mode === "comparaciones" && !tiposDisponibles.comparaciones) {
+        modeStatusEl.textContent =
+          "❌ El archivo cargado no tiene las columnas necesarias para Comparaciones (PRODUCT_TEST / RESPONSE).";
+        document.querySelectorAll('input[name="mode"]').forEach(r => { r.checked = false; });
+        return;
+      }
+      if (mode === "whiteness" && !tiposDisponibles.whiteness) {
+        modeStatusEl.textContent =
+          "❌ El archivo cargado no corresponde a un formato de Blancura (MONITOR, PRODUCT y métricas WI).";
+        document.querySelectorAll('input[name="mode"]').forEach(r => { r.checked = false; });
+        return;
+      }
+      if (mode === "resumen" && !tiposDisponibles.resumen) {
+        modeStatusEl.textContent =
+          "❌ El archivo no parece tener estructura válida para un resumen general.";
+        document.querySelectorAll('input[name="mode"]').forEach(r => { r.checked = false; });
+        return;
+      }
+      if (mode === "response_rel" && !tiposDisponibles.response_rel) {
+        modeStatusEl.textContent =
+          "❌ El archivo cargado no contiene la columna RESPONSE, necesaria para este análisis.";
+        document.querySelectorAll('input[name="mode"]').forEach(r => { r.checked = false; });
+        return;
+      }
+
+      analysisMode = mode;
+      currentPromptKey = promptKey || mode;
+
+      questionEl.placeholder =
+        "Prompt oficial cargado para el análisis elegido. Puedes ajustarlo si lo deseas…";
+
+      // === TEXTOS DE LOS PROMPTS INTERNOS (igual que tenías) ===
+      if (mode === "comparaciones") {
+        if (currentPromptKey === "comparaciones_basico") {
+          questionEl.value =
+`Analiza el archivo OUTPUT_MAP_COMPARISONS.csv para identificar cuál es el producto con mejor desempeño general. Para ello, toma en cuenta únicamente las comparaciones en las que la columna RESPONSE tenga los valores 01.SUPERIOR o 02.SUPERIOR_TREND, que indican un resultado favorable para PRODUCT_TEST frente a PRODUCT_BENCH. Evalúa cuántas veces cada valor de PRODUCT_TEST alcanza un resultado superior en todas las combinaciones posibles de las columnas MODALITY, SCENARIOS, WASH, PROCESS, MONITOR, INDEX y THRESHOLD. El producto que más veces obtenga resultados favorables según estos dos valores de RESPONSE debe ser considerado como el de mejor desempeño. La conclusión debe presentarse en texto continuo, indicando claramente cuál es el producto con mejor rendimiento y por qué, basándose en la frecuencia con la que obtiene un desempeño superior en las comparaciones.`;
+        } else if (currentPromptKey === "comparaciones_escenarios") {
+          questionEl.value =
+`Analiza el archivo OUTPUT_MAP_COMPARISONS.csv poniendo el foco en cómo cambia el desempeño de los distintos PRODUCT_TEST según las columnas MODALITY, SCENARIOS, WASH y PROCESS. Identifica para cada una de estas columnas qué productos tienden a concentrar más respuestas 01.SUPERIOR y 02.SUPERIOR_TREND, señalando si hay formulaciones especialmente fuertes en determinados escenarios o modalidades y si existen contextos donde el rendimiento se reparte de forma más equilibrada. La explicación debe ser en texto continuo, resaltando las combinaciones producto–escenario más robustas y aquellas donde las diferencias entre productos parecen menos marcadas.`;
+        }
+      } else if (mode === "whiteness") {
+        if (currentPromptKey === "whiteness_basico") {
+          questionEl.value =
+`Para cada uno de los valores únicos de la columna "MONITOR", identifica cuáles son los productos ("PRODUCT") que presentan los valores más altos en cada una de las métricas de blancura: "1.2.WI_STw" (blancura estándar), "2.2.WI_GEw" (blancura verdosa), "3.2.WI_VOw" (blancura violácea) y "4.2.WI_LGw" (blancura luminosa). Para cada caso, indica en qué combinaciones específicas de las variables "MODALITY", "SCENARIOS", "WASH" y "PROCESS" se presentan esos valores máximos. Luego, compara entre los distintos productos dentro de cada tipo de monitor, resaltando si algún producto se destaca de forma consistente en más de una métrica o en múltiples combinaciones. Finalmente, resume qué productos muestran un mejor desempeño global de blancura en función del tipo de monitor utilizado, considerando la frecuencia con la que aparecen con los valores más altos y la diversidad de condiciones en las que lo hacen.`;
+        } else if (currentPromptKey === "whiteness_productos") {
+          questionEl.value =
+`Utiliza los datos de blancura del CSV para construir un perfil de cada "PRODUCT" en términos de las métricas "1.2.WI_STw", "2.2.WI_GEw", "3.2.WI_VOw" y "4.2.WI_LGw" a través de todos los "MONITOR" disponibles. Describe en texto continuo qué productos se ubican con mayor frecuencia en los valores máximos de blancura, cuáles parecen más equilibrados entre varias métricas y cuáles destacan solo en una dimensión específica (por ejemplo, más verdosa o más luminosa). Indica también si hay productos que cambian mucho su posición relativa según el monitor utilizado, y qué implicaciones tiene esto para la lectura global de blancura.`;
+        }
+      } else if (mode === "resumen") {
+        if (currentPromptKey === "resumen_basico") {
+          questionEl.value =
+`Haz un resumen general de la tabla del CSV, describiendo cuántas filas y columnas contiene, qué tipo de información parece dominar (columnas numéricas frente a categóricas) y cómo se distribuyen los valores. Menciona, de forma interpretativa, cuáles son las columnas que parecen más relevantes o más variadas y qué patrones generales se pueden intuir solamente a partir de los recuentos y de los rangos de valores. La explicación debe ir en texto continuo, sin listas, destacando las ideas principales sobre la estructura y el contenido de la tabla.`;
+        } else if (currentPromptKey === "resumen_avanzado") {
+          questionEl.value =
+`Elabora un resumen avanzado de la tabla combinando la descripción estructural (número de filas, columnas y tipos de variables) con una lectura más interpretativa de qué grupos de columnas parecen estar relacionados entre sí. Sin realizar inferencias causales, comenta qué bloques de variables pueden agruparse (por ejemplo, columnas de contexto experimental frente a columnas de resultados) y cómo podrían utilizarse en análisis posteriores más específicos. La explicación debe ser narrativa, destacando las conexiones más plausibles sólo a partir de la estructura y de los recuentos.`;
+        }
+      } else if (mode === "response_rel") {
+        if (currentPromptKey === "response_basico") {
+          questionEl.value =
+`Compara la distribución de los valores de la columna RESPONSE con lo que ocurre en el resto de columnas del CSV. Identifica qué valores de RESPONSE son más frecuentes y, para cada uno de ellos, describe qué patrones se observan en las columnas principales (productos, monitores, modalidades, escenarios, procesos, etc.). Explica de forma narrativa si hay combinaciones de valores que aparezcan más asociadas a determinados resultados de RESPONSE, resaltando las tendencias más claras que puedan deducirse únicamente de los recuentos.`;
+        } else if (currentPromptKey === "response_extremos") {
+          questionEl.value =
+`Profundiza en la columna RESPONSE distinguiendo claramente entre los resultados más favorables y los menos favorables. Para cada grupo (por ejemplo, valores que representan superioridad, empate o inferioridad), describe qué patrones se observan en las columnas de producto, monitor, modalidad y escenario. Explica en texto continuo qué combinaciones parecen asociarse con respuestas especialmente buenas y cuáles tienden a concentrar los peores resultados, utilizando únicamente recuentos y frecuencias obtenidos del CSV.`;
+        }
+      }
+
+      let modoTexto = "";
+      if (mode === "comparaciones") modoTexto = "Comparación PRODUCT_TEST vs RESPONSE.";
+      else if (mode === "whiteness") modoTexto = "Blancura por MONITOR.";
+      else if (mode === "resumen") modoTexto = "Resumen general / avanzado.";
+      else if (mode === "response_rel") modoTexto = "RESPONSE vs otras columnas.";
+
+      modeStatusEl.textContent = "✅ Prompt interno seleccionado: " + modoTexto;
+
+      if (llmStatusEl) {
+        llmStatusEl.textContent =
+          "✅ El resumen numérico se calcula en la sección 5 solo como apoyo visual. " +
+          "La explicación de la sección 6 se generará con tu prompt y el modo de análisis, " +
+          "sin utilizar directamente el texto del resumen numérico.";
+      }
+    }
+
+    window.setMode = setModeInternal;
+
+    // -------------------------------------------------------------
+    // Llamada al backend FastAPI /generate_answer
+    // -------------------------------------------------------------
+    async function pedirExplicacionDesdeBackend(userPrompt, numericSummary, mode) {
+      const textEl = document.getElementById("textOutput");
+      const llmStatusEl = document.getElementById("llmStatus");
+
+      if (!textEl) return;
+
+      const pregunta = (userPrompt || "").trim();
+      const resumen  = (numericSummary || "").trim();  // se envía pero el backend lo ignorará
+
+      textEl.textContent = "⏳ Llamando al backend /generate_answer…";
+
+      try {
+        const resp = await fetch(BACKEND_URL, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            mode: mode || "general",
+            question: pregunta,
+            numeric_summary: resumen
+          })
+        });
+
+        if (!resp.ok) {
+          const msg = "Respuesta HTTP no OK: " + resp.status;
+          console.error(msg);
+          textEl.textContent =
+            "❌ Error llamando al backend.\n" +
+            msg +
+            "\n\nPuedes revisar el resumen numérico en la sección 5 y, si lo deseas, hacer tu propia interpretación manual.";
+          if (llmStatusEl) {
+            llmStatusEl.textContent = "❌ Backend /generate_answer respondió con error " + resp.status + ".";
+          }
+          return;
+        }
+
+        const data = await resp.json();
+        const answer = (data && data.answer) ? String(data.answer).trim() : "";
+
+        if (!answer) {
+          textEl.textContent =
+            "⚠️ El backend no devolvió una respuesta de texto utilizable.\n" +
+            "Revisa el resumen numérico en la sección 5 para interpretar manualmente.";
+          if (llmStatusEl) {
+            llmStatusEl.textContent = "⚠️ Backend sin respuesta de texto.";
+          }
+        } else {
+          textEl.textContent = answer;
+          if (llmStatusEl) {
+            llmStatusEl.textContent =
+              "✅ Respuesta generada por el backend /generate_answer usando tu prompt (la sección 5 no se ha utilizado como contexto para el modelo).";
+          }
+        }
+      } catch (err) {
+        console.error("Error llamando al backend:", err);
+        textEl.textContent =
+          "❌ Error de red al llamar al backend /generate_answer.\n" +
+          "Revisa tu conexión o el estado del Space en Hugging Face.";
+        if (llmStatusEl) {
+          llmStatusEl.textContent = "❌ Error de red hacia el backend.";
+        }
+      }
+    }
+
+    // -------------------------------------------------------------
+    // Botón principal: analizar CSV
+    //   - SIEMPRE: sección 5 numérico en navegador
+    //   - SIEMPRE: sección 6 LLM (solo con el prompt)
+    // -------------------------------------------------------------
+    function analizarCSVInternal() {
+      const statusEl  = document.getElementById("analysisStatus");
+      const numericEl = document.getElementById("numericOutput");
+      const textEl    = document.getElementById("textOutput");
+      const question  = document.getElementById("question").value.trim();
+
+      if (!csvFile) {
+        statusEl.textContent = "⚠️ Sube primero el archivo CSV en la sección 1.";
+        return;
+      }
+
+      if (!analysisMode) {
+        statusEl.textContent = "⚠️ Elige un tipo de análisis en la sección 2.";
+        return;
+      }
+
+      if (!question) {
+        statusEl.textContent = "⚠️ El prompt de análisis (sección 3) no puede estar vacío.";
+        return;
+      }
+
+      statusEl.textContent =
+        "⏳ Analizando CSV en el navegador (sección 5) y preparando la llamada al LLM con tu prompt…";
+
+      numericEl.textContent =
+        "// Procesando CSV para generar el resumen técnico…";
+      textEl.textContent =
+        "// Esperando respuesta del LLM (sección 6)…";
+
+      // Reset gráfico antes de cada nuevo análisis
+      lastChartData = null;
+      if (chartInstance) {
+        chartInstance.destroy();
+        chartInstance = null;
+      }
+      const chartStatusEl = document.getElementById("chartStatus");
+      if (chartStatusEl) {
+        chartStatusEl.textContent = "⏳ Preparando datos para posibles gráficos…";
+      }
+        // NUEVO: reset gráfico multivariable antes de cada nuevo análisis
+      lastChartDataMulti = null;
+      if (chartInstanceMulti) {
+        chartInstanceMulti.destroy();
+        chartInstanceMulti = null;
+      }
+      const chartMultiStatusEl = document.getElementById("chartMultiStatus");
+      if (chartMultiStatusEl) {
+        chartMultiStatusEl.textContent =
+          "⏳ Preparando datos para el gráfico multivariable (si el modo lo soporta)…";
+      }        
+      const usarBackendLLM = true;  // SIEMPRE LLM para la explicación
+
+      if (analysisMode === "whiteness") {
+        analizarBlancura(statusEl, numericEl, textEl, question, usarBackendLLM);
+      } else if (analysisMode === "comparaciones") {
+        analizarComparaciones(statusEl, numericEl, textEl, question, usarBackendLLM);
+      } else if (analysisMode === "resumen") {
+        analizarResumen(statusEl, numericEl, textEl, question, usarBackendLLM);
+      } else if (analysisMode === "response_rel") {
+        analizarResponseVsOtros(statusEl, numericEl, textEl, question, usarBackendLLM);
+      }
+    }
+
+    window.analizarCSV = analizarCSVInternal;
+
+ // -------------------------------------------------------------
+// Modo 1: Comparaciones PRODUCT_TEST vs RESPONSE (versión avanzada)
+//   - Mantiene los recuentos absolutos
+//   - Añade tasas de desempeño por producto
+//   - Estima significancia (z-score vs tasa global)
+//   - Analiza contextos (MODALITY, SCENARIOS, WASH, PROCESS)
+//     como posibles efectos de confusión
+//   - Explicita medidas cuantitativas directas de desempeño
+//     e información sobre variabilidad interna e interacciones
+// -------------------------------------------------------------
+function analizarComparaciones(statusEl, numericEl, textEl, userPrompt, usarBackendLLM) {
+  const objetivos = new Set(["01.SUPERIOR", "02.SUPERIOR_TREND"]);
+
+  // Favorables por PRODUCT_TEST (como antes)
+  const conteosFavorables = {};
+  // Total de comparaciones por PRODUCT_TEST (para tasas)
+  const totalPorProducto = {};
+
+  // Contextos para interrelación / posibles efectos de confusión
+  // Para cada variable de contexto guardamos total y favorables
+  const contextoStats = {
+    MODALITY: {},
+    SCENARIOS: {},
+    WASH: {},
+    PROCESS: {}
+  };
+
+  let totalFilas = 0;        // filas totales leídas del CSV
+  let totalComparaciones = 0; // filas con PRODUCT_TEST definido
+  let totalFiltradas = 0;    // filas con RESPONSE favorable
+
+  Papa.parse(csvFile, {
+    header: true,
+    skipEmptyLines: true,
+    worker: false,
+    chunkSize: 1024 * 1024,
+    chunk: function(results) {
+      const rows = results.data;
+      for (const row of rows) {
+        totalFilas++;
+
+        const ptestRaw = row["PRODUCT_TEST"];
+        const ptest = (ptestRaw || "").trim() || "(VACÍO)";
+        if (ptest) {
+          totalComparaciones++;
+          totalPorProducto[ptest] = (totalPorProducto[ptest] || 0) + 1;
+        }
+
+        const resp = (row["RESPONSE"] || "").trim();
+        const esFavorable = objetivos.has(resp);
+
+        if (esFavorable) {
+          totalFiltradas++;
+          if (ptest) {
+            conteosFavorables[ptest] = (conteosFavorables[ptest] || 0) + 1;
+          }
+        }
+
+        // Actualizar contextos: MODALITY, SCENARIOS, WASH, PROCESS
+        for (const ctxName of Object.keys(contextoStats)) {
+          const vRaw = row[ctxName];
+          const v = (vRaw || "").trim() || "(VACÍO)";
+          if (!contextoStats[ctxName][v]) {
+            contextoStats[ctxName][v] = { total: 0, fav: 0 };
+          }
+          contextoStats[ctxName][v].total++;
+          if (esFavorable) {
+            contextoStats[ctxName][v].fav++;
+          }
+        }
+      }
+    },
+    complete: function() {
+      if (!Object.keys(conteosFavorables).length) {
+        statusEl.textContent = "❌ No se encontraron filas con RESPONSE = 01.SUPERIOR o 02.SUPERIOR_TREND.";
+        numericEl.textContent = "// Sin resultados favorables para PRODUCT_TEST.";
+        textEl.textContent = "// No hay suficientes datos favorables para generar una conclusión con el LLM.";
+        prepararDatosGrafico(null);
+        return;
+      }
+
+      // -------------------------------------------------------
+      // 1) Medidas básicas globales
+      // -------------------------------------------------------
+      const totalFavorables = Object.values(conteosFavorables)
+        .reduce((s, c) => s + c, 0);
+
+      const tasaGlobal = (totalComparaciones > 0)
+        ? (totalFavorables / totalComparaciones)
+        : 0;
+
+      // Helper para porcentajes
+      const formatPct = (v) => (v * 100).toFixed(2) + "%";
+
+      // -------------------------------------------------------
+      // 2) Medidas cuantitativas de desempeño por PRODUCT_TEST
+      //    (tasa favorable, diferencia vs global, z-score, IC)
+      // -------------------------------------------------------
+      const productos = Object.keys(totalPorProducto).map(prod => {
+        const n = totalPorProducto[prod] || 0;
+        const k = conteosFavorables[prod] || 0;
+        const tasa = n > 0 ? (k / n) : 0;
+        const diff = tasa - tasaGlobal;
+
+        let z = null;
+        let ciLow = null;
+        let ciHigh = null;
+
+        if (n > 0 && tasaGlobal > 0 && tasaGlobal < 1) {
+          const se = Math.sqrt(tasaGlobal * (1 - tasaGlobal) / n);
+          if (se > 0) {
+            z = diff / se;
+            const half = 1.96 * se;
+            ciLow = tasa - half;
+            ciHigh = tasa + half;
+          }
+        }
+
+        return { prod, n, k, tasa, diff, z, ciLow, ciHigh };
+      });
+
+      // Ordenamos por tasa favorable descendente
+      productos.sort((a, b) => b.tasa - a.tasa);
+
+      // -------------------------------------------------------
+      // 3) Interrelación y posibles efectos de confusión
+      //    (contextos con tasas muy altas o muy bajas)
+      // -------------------------------------------------------
+      const contextoResumen = [];
+
+      for (const ctxName of Object.keys(contextoStats)) {
+        const mapa = contextoStats[ctxName];
+        const arr = Object.entries(mapa).map(([valor, st]) => {
+          const tasaCtx = st.total > 0 ? (st.fav / st.total) : 0;
+          const diffCtx = tasaCtx - tasaGlobal;
+          return {
+            valor,
+            total: st.total,
+            fav: st.fav,
+            tasa: tasaCtx,
+            diff: diffCtx
+          };
+        });
+
+        // Filtramos para evitar ruido extremo (muy pocos casos)
+        const arrFiltrado = arr.filter(x => x.total >= 20);
+
+        // Contextos con tasas muy por encima de la media
+        const topAltos = arrFiltrado
+          .filter(x => x.diff > 0)
+          .sort((a, b) => b.diff - a.diff)
+          .slice(0, 3);
+
+        // Contextos con tasas muy por debajo de la media
+        const topBajos = arrFiltrado
+          .filter(x => x.diff < 0)
+          .sort((a, b) => a.diff - b.diff)
+          .slice(0, 3);
+
+        contextoResumen.push({
+          ctxName,
+          altos: topAltos,
+          bajos: topBajos
+        });
+      }
+
+      // -------------------------------------------------------
+      // 4) Construcción del TEXTO de la sección 5
+      // -------------------------------------------------------
+      let numTxt = "";
+
+      // 🔹 BLOQUE EXPLÍCITO: medidas de desempeño + variabilidad + interacciones
+      numTxt += "CAPACIDAD ANALÍTICA DISPONIBLE EN ESTE MODO (COMPARACIONES)\n";
+      numTxt += "================================================================\n";
+      numTxt += "- Medidas cuantitativas directas de desempeño más allá de la tasa global:\n";
+      numTxt += "  • Tasas favorables específicas por PRODUCT_TEST (k/n) y su diferencia\n";
+      numTxt += "    frente a la tasa global de éxito.\n";
+      numTxt += "  • Intervalos de confianza aproximados (IC 95%) por producto para acotar\n";
+      numTxt += "    la magnitud esperada de rendimiento.\n";
+      numTxt += "- Información sobre variabilidad interna e interacciones entre variables:\n";
+      numTxt += "  • La comparación simultánea de PRODUCT_TEST con MODALITY, SCENARIOS,\n";
+      numTxt += "    WASH y PROCESS permite evaluar cómo cambia el desempeño del producto\n";
+      numTxt += "    según el contexto experimental.\n";
+      numTxt += "  • Las diferencias de tasa entre contextos funcionan como indicador de\n";
+      numTxt += "    posibles interacciones y efectos de confusión (escenarios que inflan\n";
+      numTxt += "    o deprimen artificialmente el rendimiento observado).\n\n";
+
+      // 4.1 Panorama global
+      numTxt += "PANORAMA GLOBAL DE LAS COMPARACIONES\n";
+      numTxt += "------------------------------------\n";
+      numTxt += "Total de filas leídas en el CSV: " + totalFilas + "\n";
+      numTxt += "Total de comparaciones con PRODUCT_TEST definido: " + totalComparaciones + "\n";
+      numTxt += "Filas con RESPONSE en {01.SUPERIOR, 02.SUPERIOR_TREND}: " + totalFiltradas + "\n";
+      numTxt += "Tasa global de resultados favorables: " + formatPct(tasaGlobal) + "\n\n";
+
+      // 4.2 Medidas cuantitativas por producto
+      numTxt += "MEDIDAS CUANTITATIVAS DE DESEMPEÑO POR PRODUCT_TEST\n";
+      numTxt += "---------------------------------------------------\n";
+      numTxt += "Ordenado por tasa favorable (k/n), con indicador de significancia aproximada vs tasa global.\n";
+      numTxt += "Las tasas se expresan como proporción de comparaciones en las que el producto resulta favorable.\n\n";
+      numTxt += "Producto | n total | k favorables | Tasa favorable | Diferencia vs global | z-score | IC 95% aprox.\n";
+      numTxt += "---------|---------|-------------|----------------|----------------------|---------|----------------\n";
+
+      productos.forEach(p => {
+        const diffPct = (p.diff * 100).toFixed(2);
+        const zTxt = (p.z === null) ? "NA" : p.z.toFixed(2);
+
+        let icTxt = "NA";
+        if (p.ciLow !== null && p.ciHigh !== null) {
+          const low = Math.max(0, Math.min(1, p.ciLow));
+          const high = Math.max(0, Math.min(1, p.ciHigh));
+          icTxt = "[" + formatPct(low) + " ; " + formatPct(high) + "]";
+        }
+
+        numTxt +=
+          p.prod + " | " +
+          p.n + " | " +
+          p.k + " | " +
+          formatPct(p.tasa) + " | " +
+          (diffPct >= 0 ? "+" + diffPct : diffPct) + " p.p. | " +
+          zTxt + " | " +
+          icTxt + "\n";
+      });
+
+      numTxt += "\n";
+      numTxt += "Interpretación rápida del z-score:\n";
+      numTxt += "- |z| ≈ 0–1.5: diferencias pequeñas o poco claras.\n";
+      numTxt += "- |z| ≈ 1.5–2.0: tendencia a diferencia, pero con incertidumbre.\n";
+      numTxt += "- |z| ≥ 2.0: posible diferencia estadísticamente relevante frente a la tasa global.\n\n";
+
+      // 4.3 Interrelación entre variables y posibles efectos de confusión
+      numTxt += "INTERRELACIÓN ENTRE VARIABLES Y POSIBLES EFECTOS DE CONFUSIÓN\n";
+      numTxt += "------------------------------------------------------------\n";
+      numTxt += "Se exploran MODALITY, SCENARIOS, WASH y PROCESS como contextos que pueden favorecer o penalizar\n";
+      numTxt += "la tasa de resultados favorables frente a la tasa global.\n\n";
+
+      contextoResumen.forEach(ctx => {
+        numTxt += "Variable de contexto: " + ctx.ctxName + "\n";
+
+        if (ctx.altos.length) {
+          numTxt += "  Contextos con tasa favorable claramente superior a la media global:\n";
+          ctx.altos.forEach(c => {
+            const diffPct = (c.diff * 100).toFixed(2);
+            numTxt +=
+              "    - " + c.valor +
+              " | n=" + c.total +
+              ", favorables=" + c.fav +
+              ", tasa=" + formatPct(c.tasa) +
+              ", diferencia vs global=" +
+              (diffPct >= 0 ? "+" + diffPct : diffPct) + " p.p.\n";
+          });
+        } else {
+          numTxt += "  No se observaron contextos con tasas muy por encima de la media (con n≥20).\n";
+        }
+
+        if (ctx.bajos.length) {
+          numTxt += "  Contextos con tasa favorable claramente por debajo de la media global:\n";
+          ctx.bajos.forEach(c => {
+            const diffPct = (c.diff * 100).toFixed(2);
+            numTxt +=
+              "    - " + c.valor +
+              " | n=" + c.total +
+              ", favorables=" + c.fav +
+              ", tasa=" + formatPct(c.tasa) +
+              ", diferencia vs global=" + diffPct + " p.p.\n";
+          });
+        } else {
+          numTxt += "  No se observaron contextos con tasas muy por debajo de la media (con n≥20).\n";
+        }
+
+        numTxt += "\n";
+      });
+
+      // 👉 Sección 5 SIEMPRE usa este cálculo interno enriquecido
+      numericEl.textContent = numTxt;
+
+      // 👉 Sección 7: gráfico de barras/líneas de conteos por PRODUCT_TEST (como antes)
+      const ordenadosPorFavorable = Object.entries(conteosFavorables)
+        .sort((a, b) => b[1] - a[1]);
+
+      prepararDatosGrafico({
+        labels: ordenadosPorFavorable.map(([prod]) => prod),
+        values: ordenadosPorFavorable.map(([, cnt]) => cnt),
+        datasetLabel: "Resultados favorables",
+        title: "Resultados favorables por PRODUCT_TEST",
+        xLabel: "PRODUCT_TEST",
+        yLabel: "Número de resultados favorables"
+      });
+         // 👉 NUEVO: gráfico multivariable (sección 7) para el modo Comparaciones
+      //     - Serie 1: tasa favorable (%) por PRODUCT_TEST
+      //     - Serie 2: número total de comparaciones por PRODUCT_TEST
+      const labelsMulti = productos.map(p => p.prod);
+      const valuesTasa = productos.map(p => p.tasa * 100);  // porcentaje
+      const valuesN = productos.map(p => p.n);              // número de comparaciones
+
+      prepararDatosGraficoMultivariable({
+        labels: labelsMulti,
+        datasets: [
+          {
+            label: "Tasa favorable (%)",
+            values: valuesTasa
+          },
+          {
+            label: "Número total de comparaciones",
+            values: valuesN
+          }
+        ],
+        title: "Tasa favorable (%) y nº de comparaciones por PRODUCT_TEST",
+        xLabel: "PRODUCT_TEST",
+        yLabel: "Escala relativa (tasa % y conteos)"
+      });
+
+
+      if (usarBackendLLM) {
+        // numeric_summary lleva TODO este contenido enriquecido a /generate_answer
+        pedirExplicacionDesdeBackend(userPrompt, numTxt, "comparaciones");
+        statusEl.textContent =
+          "✅ Análisis de comparaciones numérico avanzado generado. " +
+          "Esperando respuesta del LLM en la sección 6…";
+      }
+    },
+    error: function(err) {
+      statusEl.textContent = "❌ Error al leer el CSV: " + err;
+      numericEl.textContent = "// Error al procesar el archivo.";
+      textEl.textContent = "";
+      prepararDatosGrafico(null);
+    }
+  });
+}
+
+
+       // -------------------------------------------------------------
+    // Modo 2: Blancura por MONITOR (versión avanzada)
+    //   - Mantiene máximos por MONITOR y métrica (como antes)
+    //   - Añade medias globales y por PRODUCT para cada métrica
+    //   - Estima significancia (z-score) de la media por producto
+    //     frente a la media global para cada métrica
+    //   - Analiza MONITOR como posible fuente de confusión
+    // -------------------------------------------------------------
+    function analizarBlancura(statusEl, numericEl, textEl, userPrompt, usarBackendLLM) {
+      const dataMax = {};           // máximos por MONITOR y métrica
+      const globalAgg = {};         // métrica -> {sum, sumsq, count}
+      const prodAgg = {};           // PRODUCT -> métrica -> {sum, sumsq, count}
+      const monitorAgg = {};        // MONITOR -> métrica -> {sum, sumsq, count}
+      const globalCountsMax = {};   // conteo de apariciones como máximo (como antes)
+
+      let totalFilas = 0;
+
+      const ensureAgg = (agg, key1, key2) => {
+        if (!agg[key1]) agg[key1] = {};
+        if (!agg[key1][key2]) agg[key1][key2] = { sum: 0, sumsq: 0, count: 0 };
+        return agg[key1][key2];
+      };
+
+      Papa.parse(csvFile, {
+        header: true,
+        skipEmptyLines: true,
+        worker: false,
+        chunkSize: 1024 * 1024,
+        chunk: function(results) {
+          const rows = results.data;
+          for (const row of rows) {
+            totalFilas++;
+            const monitor = (row["MONITOR"] || "").trim();
+            const product = (row["PRODUCT"] || "").trim();
+            if (!monitor || !product) continue;
+
+            for (const m of whitenessMetrics) {
+              if (!(m in row)) continue;
+              const v = parseFloat(row[m]);
+              if (Number.isNaN(v)) continue;
+
+              // Global
+              if (!globalAgg[m]) {
+                globalAgg[m] = { sum: 0, sumsq: 0, count: 0 };
+              }
+              globalAgg[m].sum += v;
+              globalAgg[m].sumsq += v * v;
+              globalAgg[m].count++;
+
+              // Por producto
+              const pa = ensureAgg(prodAgg, product, m);
+              pa.sum += v;
+              pa.sumsq += v * v;
+              pa.count++;
+
+              // Por monitor
+              const ma = ensureAgg(monitorAgg, monitor, m);
+              ma.sum += v;
+              ma.sumsq += v * v;
+              ma.count++;
+
+              // Máximos por monitor/métrica (como antes)
+              if (!dataMax[monitor]) dataMax[monitor] = {};
+              if (!dataMax[monitor][m]) dataMax[monitor][m] = { max: null, rows: [] };
+
+              const entry = dataMax[monitor][m];
+              if (entry.max === null || v > entry.max) {
+                entry.max = v;
+                entry.rows = [{
+                  PRODUCT: product,
+                  MODALITY: row["MODALITY"] || "",
+                  SCENARIOS: row["SCENARIOS"] || "",
+                  WASH: row["WASH"] || "",
+                  PROCESS: row["PROCESS"] || "",
+                  VALUE: v
+                }];
+              } else if (v === entry.max) {
+                entry.rows.push({
+                  PRODUCT: product,
+                  MODALITY: row["MODALITY"] || "",
+                  SCENARIOS: row["SCENARIOS"] || "",
+                  WASH: row["WASH"] || "",
+                  PROCESS: row["PROCESS"] || "",
+                  VALUE: v
+                });
+              }
+            }
+          }
+        },
+        complete: function() {
+          if (!Object.keys(globalAgg).length) {
+            statusEl.textContent = "❌ No se encontraron datos válidos de blancura por MONITOR.";
+            numericEl.textContent = "// Sin resultados de métricas de blancura.";
+            textEl.textContent = "// No hay suficientes datos de blancura para generar una conclusión con el LLM.";
+            prepararDatosGrafico(null);
+            return;
+          }
+
+          const formatPct = (v) => (v * 100).toFixed(2) + "%";
+
+          // -----------------------------------------
+          // 1) Estadísticos globales por métrica
+          // -----------------------------------------
+          const globalStats = {}; // m -> {mean, sd, count}
+          for (const m of Object.keys(globalAgg)) {
+            const g = globalAgg[m];
+            const mean = g.count > 0 ? (g.sum / g.count) : 0;
+            const varv = g.count > 0 ? Math.max(0, (g.sumsq / g.count) - mean * mean) : 0;
+            const sd = Math.sqrt(varv);
+            globalStats[m] = { mean, sd, count: g.count };
+          }
+
+          // -----------------------------------------
+          // 2) Perfil cuantitativo por PRODUCT
+          // -----------------------------------------
+          const productosStats = {}; // m -> array de {product, n, mean, diff, z}
+          for (const product of Object.keys(prodAgg)) {
+            const metrics = prodAgg[product];
+            for (const m of Object.keys(metrics)) {
+              const a = metrics[m];
+              const g = globalStats[m];
+              if (!g || g.count === 0) continue;
+
+              const meanProd = a.count > 0 ? (a.sum / a.count) : 0;
+              const diff = meanProd - g.mean;
+
+              let z = null;
+              if (a.count > 1 && g.sd > 0) {
+                const se = g.sd / Math.sqrt(a.count);
+                if (se > 0) {
+                  z = diff / se;
+                }
+              }
+
+              if (!productosStats[m]) productosStats[m] = [];
+              productosStats[m].push({
+                product,
+                n: a.count,
+                mean: meanProd,
+                diff,
+                z
+              });
+            }
+          }
+
+          // Ordenamos por métrica y por media desc
+          for (const m of Object.keys(productosStats)) {
+            productosStats[m].sort((a, b) => b.mean - a.mean);
+          }
+
+          // -----------------------------------------
+          // 3) Conteo global de apariciones como máximo (como antes)
+          // -----------------------------------------
+          for (const monitor of Object.keys(dataMax)) {
+            const metricsObj = dataMax[monitor];
+            for (const metric of Object.keys(metricsObj)) {
+              const info = metricsObj[metric];
+              for (const row of info.rows) {
+                const prod = row.PRODUCT || "(VACÍO)";
+                globalCountsMax[prod] = (globalCountsMax[prod] || 0) + 1;
+              }
+            }
+          }
+          const globalSortedMax = Object.entries(globalCountsMax).sort((a, b) => b[1] - a[1]);
+
+          // -----------------------------------------
+          // 4) Interrelación y confusión por MONITOR
+          // -----------------------------------------
+          const monitorResumen = {}; // m -> {altos:[], bajos:[]}
+          for (const monitor of Object.keys(monitorAgg)) {
+            const metrics = monitorAgg[monitor];
+            for (const m of Object.keys(metrics)) {
+              const a = metrics[m];
+              const g = globalStats[m];
+              if (!g || g.count === 0) continue;
+
+              const meanMon = a.count > 0 ? (a.sum / a.count) : 0;
+              const diff = meanMon - g.mean;
+
+              let z = null;
+              if (a.count > 1 && g.sd > 0) {
+                const se = g.sd / Math.sqrt(a.count);
+                if (se > 0) z = diff / se;
+              }
+
+              if (!monitorResumen[m]) monitorResumen[m] = [];
+              monitorResumen[m].push({
+                monitor,
+                n: a.count,
+                mean: meanMon,
+                diff,
+                z
+              });
+            }
+          }
+
+          const monitorCtx = {};
+          for (const m of Object.keys(monitorResumen)) {
+            const lista = monitorResumen[m].filter(x => x.n >= 10);
+            const altos = lista.filter(x => x.diff > 0)
+              .sort((a, b) => b.diff - a.diff)
+              .slice(0, 3);
+            const bajos = lista.filter(x => x.diff < 0)
+              .sort((a, b) => a.diff - b.diff)
+              .slice(0, 3);
+            monitorCtx[m] = { altos, bajos };
+          }
+
+          // -----------------------------------------
+          // 5) Construcción del TEXTO sección 5
+          // -----------------------------------------
+          let numTxt = "";
+
+          numTxt += "PANORAMA GLOBAL DE LAS MÉTRICAS DE BLANCURA\n";
+          numTxt += "-------------------------------------------\n";
+          numTxt += "Total de filas leídas: " + totalFilas + "\n\n";
+
+          numTxt += "Estadísticos globales por métrica de blancura:\n";
+          for (const m of whitenessMetrics) {
+            const g = globalStats[m];
+            if (!g) continue;
+            numTxt +=
+              "  - " + m +
+              " | n=" + g.count +
+              " | media global≈ " + g.mean.toFixed(3) +
+              " | desviación estándar≈ " + g.sd.toFixed(3) + "\n";
+          }
+          numTxt += "\n";
+
+          numTxt += "PERFIL CUANTITATIVO DE BLANCURA POR PRODUCTO\n";
+          numTxt += "---------------------------------------------\n";
+          numTxt += "Se muestran medias por producto y métrica, comparadas con la media global (diferencia y z-score aproximado).\n\n";
+
+          for (const m of whitenessMetrics) {
+            const lista = productosStats[m];
+            const g = globalStats[m];
+            if (!lista || !lista.length || !g) continue;
+
+            numTxt += "Métrica: " + m + " (media global≈ " + g.mean.toFixed(3) + ")\n";
+            numTxt += "PRODUCT | n | media producto | diferencia vs global | z-score aprox.\n";
+            numTxt += "--------|---|----------------|----------------------|-----------------\n";
+
+            lista.forEach(p => {
+              const diffTxt = p.diff.toFixed(3);
+              const zTxt = (p.z === null) ? "NA" : p.z.toFixed(2);
+              numTxt +=
+                p.product + " | " +
+                p.n + " | " +
+                p.mean.toFixed(3) + " | " +
+                (p.diff >= 0 ? "+" + diffTxt : diffTxt) + " | " +
+                zTxt + "\n";
+            });
+            numTxt += "\n";
+          }
+
+          numTxt += "MÁXIMOS DE BLANCURA POR MONITOR Y MÉTRICA\n";
+          numTxt += "-----------------------------------------\n";
+          for (const monitor of Object.keys(dataMax).sort()) {
+            numTxt += "MONITOR = " + monitor + "\n";
+            const metricsObj = dataMax[monitor];
+            for (const metric of Object.keys(metricsObj)) {
+              const info = metricsObj[metric];
+              numTxt += "  Métrica: " + metric + ", valor máximo: " + info.max + "\n";
+              for (const row of info.rows) {
+                numTxt += "    - PRODUCT = " + row.PRODUCT +
+                          ", MODALITY = " + row.MODALITY +
+                          ", SCENARIOS = " + row.SCENARIOS +
+                          ", WASH = " + row.WASH +
+                          ", PROCESS = " + row.PROCESS + "\n";
+              }
+            }
+            numTxt += "\n";
+          }
+
+          numTxt += "Conteo global de apariciones como máximo de blancura por PRODUCT:\n";
+          globalSortedMax.forEach(([prod, cnt]) => {
+            numTxt += "  - " + prod + ": " + cnt + "\n";
+          });
+          numTxt += "\n";
+
+          numTxt += "POSSIBLES EFECTOS DE CONFUSIÓN ASOCIADOS A MONITOR\n";
+          numTxt += "--------------------------------------------------\n";
+          numTxt += "Se indica dónde los MONITOR muestran medias muy por encima o por debajo de la media global.\n\n";
+
+          for (const m of whitenessMetrics) {
+            const ctx = monitorCtx[m];
+            const g = globalStats[m];
+            if (!ctx || !g) continue;
+
+            numTxt += "Métrica: " + m + " (media global≈ " + g.mean.toFixed(3) + ")\n";
+
+            if (ctx.altos.length) {
+              numTxt += "  MONITOR con medias de blancura claramente superiores a la global:\n";
+              ctx.altos.forEach(c => {
+                const diffTxt = c.diff.toFixed(3);
+                const zTxt = (c.z === null) ? "NA" : c.z.toFixed(2);
+                numTxt +=
+                  "    - MONITOR=" + c.monitor +
+                  " | n=" + c.n +
+                  " | media≈ " + c.mean.toFixed(3) +
+                  " | diferencia vs global=" + (c.diff >= 0 ? "+" + diffTxt : diffTxt) +
+                  " | z≈ " + zTxt + "\n";
+              });
+            } else {
+              numTxt += "  No se observaron MONITOR con medias muy por encima de la global (n≥10).\n";
+            }
+
+            if (ctx.bajos.length) {
+              numTxt += "  MONITOR con medias de blancura claramente inferiores a la global:\n";
+              ctx.bajos.forEach(c => {
+                const diffTxt = c.diff.toFixed(3);
+                const zTxt = (c.z === null) ? "NA" : c.z.toFixed(2);
+                numTxt +=
+                  "    - MONITOR=" + c.monitor +
+                  " | n=" + c.n +
+                  " | media≈ " + c.mean.toFixed(3) +
+                  " | diferencia vs global=" + diffTxt +
+                  " | z≈ " + zTxt + "\n";
+              });
+            } else {
+              numTxt += "  No se observaron MONITOR con medias muy por debajo de la global (n≥10).\n";
+            }
+
+            numTxt += "\n";
+          }
+
+          // 👉 Sección 5
+          numericEl.textContent = numTxt;
+
+          // 👉 Sección 7: gráfico de apariciones como máximo por PRODUCT (como antes)
+          prepararDatosGrafico({
+            labels: globalSortedMax.map(([prod]) => prod),
+            values: globalSortedMax.map(([, cnt]) => cnt),
+            datasetLabel: "Apariciones como máximo de blancura",
+            title: "Apariciones como máximo de blancura por PRODUCT",
+            xLabel: "PRODUCT",
+            yLabel: "Número de apariciones como máximo"
+          });
+
+          if (usarBackendLLM) {
+            pedirExplicacionDesdeBackend(userPrompt, numTxt, "whiteness");
+            statusEl.textContent =
+              "✅ Análisis de blancura numérico avanzado generado. Esperando respuesta del LLM en la sección 6…";
+          }
+        },
+        error: function(err) {
+          statusEl.textContent = "❌ Error al leer el CSV: " + err;
+          numericEl.textContent = "// Error al procesar el archivo.";
+          textEl.textContent = "";
+          prepararDatosGrafico(null);
+        }
+      });
+    }
+       // -------------------------------------------------------------
+    // Modo 3: Resumen general de la tabla
+    // -------------------------------------------------------------
+    function analizarResumen(statusEl, numericEl, textEl, userPrompt, usarBackendLLM) {
+      const stats = {};
+      let totalFilas = 0;
+      let headersLocal = null;
+
+      Papa.parse(csvFile, {
+        header: true,
+        skipEmptyLines: true,
+        worker: false,
+        chunkSize: 1024 * 1024,
+        chunk: function(results) {
+          const rows = results.data;
+          if (!headersLocal) {
+            headersLocal = results.meta && results.meta.fields ? results.meta.fields : [];
+          }
+          for (const row of rows) {
+            totalFilas++;
+            for (const col of Object.keys(row)) {
+              if (!stats[col]) {
+                stats[col] = {
+                  numericCount: 0,
+                  nonNumericCount: 0,
+                  sum: 0,
+                  min: null,
+                  max: null,
+                  categories: {}
+                };
+              }
+              const valRaw = row[col];
+              if (valRaw === null || valRaw === undefined) continue;
+              const val = String(valRaw).trim();
+              if (val === "") continue;
+
+              const num = parseFloat(val.replace(",", "."));
+              if (!Number.isNaN(num) && val.match(/^[+-]?(\d+(\.\d+)?|\.\d+)$/)) {
+                stats[col].numericCount++;
+                stats[col].sum += num;
+                if (stats[col].min === null || num < stats[col].min) stats[col].min = num;
+                if (stats[col].max === null || num > stats[col].max) stats[col].max = num;
+              } else {
+                stats[col].nonNumericCount++;
+                stats[col].categories[val] = (stats[col].categories[val] || 0) + 1;
+              }
+            }
+          }
+        },
+        complete: function() {
+          if (!headersLocal || !headersLocal.length) {
+            statusEl.textContent = "❌ No se pudo detectar estructura válida en el CSV.";
+            numericEl.textContent = "// Sin información estructural disponible.";
+            textEl.textContent = "// No hay suficiente información para generar un resumen con el LLM.";
+            prepararDatosGrafico(null);
+            return;
+          }
+
+          const numCols = headersLocal.length;
+          let numTxt = "";
+          numTxt += "Total de filas leídas: " + totalFilas + "\n";
+          numTxt += "Total de columnas detectadas: " + numCols + "\n\n";
+
+          numTxt += "Resumen por columna:\n";
+          headersLocal.forEach(col => {
+            const s = stats[col] || {
+              numericCount: 0, nonNumericCount: 0,
+              sum: 0, min: null, max: null, categories: {}
+            };
+            const esNumerica = s.numericCount > 0 && s.nonNumericCount === 0;
+            numTxt += "Columna: " + col + "\n";
+            if (esNumerica) {
+              const mean = s.numericCount > 0 ? (s.sum / s.numericCount) : null;
+              numTxt += "  Tipo: numérica\n";
+              numTxt += "  Valores válidos: " + s.numericCount + "\n";
+              if (s.min !== null && s.max !== null) {
+                numTxt += "  Rango aproximado: [" + s.min + ", " + s.max + "]\n";
+              }
+              if (mean !== null) {
+                numTxt += "  Promedio aproximado: " + mean + "\n";
+              }
+            } else {
+              const cats = Object.entries(s.categories);
+              numTxt += "  Tipo: categórica / mixta\n";
+              numTxt += "  Valores no vacíos: " + (s.numericCount + s.nonNumericCount) + "\n";
+              numTxt += "  Nº de categorías distintas: " + cats.length + "\n";
+              if (cats.length) {
+                const topCats = cats.sort((a,b) => b[1]-a[1]).slice(0,5);
+                numTxt += "  Categorías más frecuentes:\n";
+                topCats.forEach(([v,c]) => {
+                  numTxt += "    - " + v + " (" + c + " ocurrencias)\n";
+                });
+              }
+            }
+            numTxt += "\n";
+          });
+
+          // 👉 Sección 5 SIEMPRE el mismo resumen interno
+          numericEl.textContent = numTxt;
+
+          // 👉 Sección 7: gráfico simple de densidad de datos por columna
+          const labels = headersLocal;
+          const values = headersLocal.map(col => {
+            const s = stats[col] || { numericCount: 0, nonNumericCount: 0 };
+            return (s.numericCount || 0) + (s.nonNumericCount || 0);
+          });
+          prepararDatosGrafico({
+            labels,
+            values,
+            datasetLabel: "Valores no vacíos",
+            title: "Valores no vacíos por columna",
+            xLabel: "Columnas",
+            yLabel: "Número de valores no vacíos"
+          });
+
+          if (usarBackendLLM) {
+            pedirExplicacionDesdeBackend(userPrompt, numTxt, "resumen");
+            statusEl.textContent = "✅ Resumen numérico generado. Esperando respuesta del LLM en la sección 6…";
+          }
+        },
+        error: function(err) {
+          statusEl.textContent = "❌ Error al leer el CSV: " + err;
+          numericEl.textContent = "// Error al procesar el archivo.";
+          textEl.textContent = "";
+          prepararDatosGrafico(null);
+        }
+      });
+    }
+
+
+        // -------------------------------------------------------------
+    // Modo 4: Comparar RESPONSE con las demás columnas (versión avanzada)
+    //   - Mantiene la distribución global de RESPONSE
+    //   - Mantiene las asociaciones básicas columna–valor–RESPONSE
+    //   - Añade medidas cuantitativas de desempeño (tasas favorables)
+    //     usando RESPONSE={01.SUPERIOR,02.SUPERIOR_TREND} como “favorables”
+    //   - Estima significancia (z-score) de esas tasas por contexto
+    //   - Detecta contextos (valores de columnas) que suben/bajan mucho
+    //     la probabilidad de respuesta favorable (efectos de confusión)
+    // -------------------------------------------------------------
+    function analizarResponseVsOtros(statusEl, numericEl, textEl, userPrompt, usarBackendLLM) {
+      const objetivos = new Set(["01.SUPERIOR", "02.SUPERIOR_TREND"]);
+
+      const responseCounts = {};
+      const responseColumnCounts = {};
+      const contextoFavStats = {}; // col -> valor -> {total, fav}
+
+      let totalFilas = 0;
+      let headersLocal = null;
+      let totalFavorables = 0;
+
+      Papa.parse(csvFile, {
+        header: true,
+        skipEmptyLines: true,
+        worker: false,
+        chunkSize: 1024 * 1024,
+        chunk: function(results) {
+          const rows = results.data;
+          if (!headersLocal) {
+            headersLocal = results.meta && results.meta.fields ? results.meta.fields : [];
+          }
+          for (const row of rows) {
+            totalFilas++;
+
+            const rRaw = row["RESPONSE"];
+            const resp = (rRaw === undefined || rRaw === null || String(rRaw).trim() === "")
+              ? "(VACÍO)" : String(rRaw).trim();
+
+            responseCounts[resp] = (responseCounts[resp] || 0) + 1;
+
+            const esFavorable = objetivos.has(resp);
+            if (esFavorable) totalFavorables++;
+
+            for (const col of headersLocal) {
+              if (col === "RESPONSE") continue;
+              const vRaw = row[col];
+              const val = (vRaw === undefined || vRaw === null || String(vRaw).trim() === "")
+                ? "(VACÍO)" : String(vRaw).trim();
+
+              // Mapa de valores por RESPONSE (como antes)
+              if (!responseColumnCounts[col]) responseColumnCounts[col] = {};
+              if (!responseColumnCounts[col][resp]) responseColumnCounts[col][resp] = {};
+              responseColumnCounts[col][resp][val] =
+                (responseColumnCounts[col][resp][val] || 0) + 1;
+
+              // Estadísticos de desempeño favorable por contexto
+              if (!contextoFavStats[col]) contextoFavStats[col] = {};
+              if (!contextoFavStats[col][val]) contextoFavStats[col][val] = { total: 0, fav: 0 };
+              contextoFavStats[col][val].total++;
+              if (esFavorable) contextoFavStats[col][val].fav++;
+            }
+          }
+        },
+        complete: function() {
+          if (!headersLocal || !headersLocal.length) {
+            statusEl.textContent = "❌ No se pudo detectar estructura válida en el CSV.";
+            numericEl.textContent = "// Sin información estructural disponible.";
+            textEl.textContent = "// No hay suficiente información para analizar RESPONSE con el LLM.";
+            prepararDatosGrafico(null);
+            return;
+          }
+
+          const sortedResponses = Object.entries(responseCounts).sort((a, b) => b[1] - a[1]);
+
+          let numTxt = "";
+
+          // -----------------------------------------
+          // 1) Distribución global de RESPONSE
+          // -----------------------------------------
+          numTxt += "DISTRIBUCIÓN GLOBAL DE RESPONSE\n";
+          numTxt += "--------------------------------\n";
+          numTxt += "Total de filas leídas: " + totalFilas + "\n\n";
+
+          sortedResponses.forEach(([r, c]) => {
+            const pct = totalFilas > 0 ? (c * 100 / totalFilas).toFixed(2) + "%" : "–";
+            numTxt += "  - " + r + ": " + c + " filas (" + pct + ")\n";
+          });
+          numTxt += "\n";
+
+          // -----------------------------------------
+          // 2) Asociaciones básicas (como antes)
+          // -----------------------------------------
+          numTxt += "ASOCIACIONES BÁSICAS ENTRE RESPONSE Y OTRAS COLUMNAS\n";
+          numTxt += "----------------------------------------------------\n";
+          numTxt += "Se muestran, para las primeras 6 columnas distintas de RESPONSE, los valores más frecuentes\n";
+          numTxt += "dentro de cada categoría de RESPONSE.\n\n";
+
+          const colsAnalizar = headersLocal.filter(c => c !== "RESPONSE").slice(0, 6);
+          const resumenColumnas = [];
+
+          colsAnalizar.forEach(col => {
+            const byResp = responseColumnCounts[col] || {};
+            numTxt += "Columna: " + col + "\n";
+            const perResponseTop = {};
+            sortedResponses.forEach(([resp, _cntR]) => {
+              const mapaValores = byResp[resp];
+              if (!mapaValores) return;
+              const sortedVals = Object.entries(mapaValores).sort((a, b) => b[1] - a[1]).slice(0, 3);
+              if (!sortedVals.length) return;
+              perResponseTop[resp] = sortedVals;
+
+              numTxt += "  RESPONSE = " + resp + ":\n";
+              sortedVals.forEach(([v, c]) => {
+                numTxt += "    - " + v + " (" + c + " filas)\n";
+              });
+            });
+            numTxt += "\n";
+            resumenColumnas.push({ columna: col, perResponseTop });
+          });
+
+          // -----------------------------------------
+          // 3) Medidas cuantitativas de desempeño
+          //    y posibles efectos de confusión
+          // -----------------------------------------
+          const objetivosExistentes = totalFavorables > 0;
+          if (objetivosExistentes) {
+            const pGlobal = totalFavorables / totalFilas;
+            const formatPct = (v) => (v * 100).toFixed(2) + "%";
+
+            numTxt += "MEDIDAS CUANTITATIVAS DE DESEMPEÑO (RESPUESTA FAVORABLE)\n";
+            numTxt += "--------------------------------------------------------\n";
+            numTxt += "Se considera como 'respuesta favorable' RESPONSE en {01.SUPERIOR, 02.SUPERIOR_TREND}.\n";
+            numTxt += "Tasa global de respuesta favorable: " + formatPct(pGlobal) + "\n\n";
+
+            numTxt += "INTERRELACIÓN ENTRE VARIABLES Y POSIBLES EFECTOS DE CONFUSIÓN\n";
+            numTxt += "------------------------------------------------------------\n";
+            numTxt += "Para cada una de las primeras 6 columnas se identifican valores de contexto\n";
+            numTxt += "que aumentan o reducen significativamente la probabilidad de respuesta favorable.\n\n";
+
+            colsAnalizar.forEach(col => {
+              const mapa = contextoFavStats[col] || {};
+              const arr = Object.entries(mapa).map(([val, st]) => {
+                const n = st.total;
+                const fav = st.fav;
+                const tasa = n > 0 ? (fav / n) : 0;
+                const diff = tasa - pGlobal;
+                let z = null;
+                if (n > 1 && pGlobal > 0 && pGlobal < 1) {
+                  const se = Math.sqrt(pGlobal * (1 - pGlobal) / n);
+                  if (se > 0) z = diff / se;
+                }
+                return { val, n, fav, tasa, diff, z };
+              });
+
+              const arrFiltrado = arr.filter(x => x.n >= 20); // evitar ruido con pocos casos
+              if (!arrFiltrado.length) return;
+
+              const altos = arrFiltrado
+                .filter(x => x.diff > 0)
+                .sort((a, b) => b.diff - a.diff)
+                .slice(0, 3);
+              const bajos = arrFiltrado
+                .filter(x => x.diff < 0)
+                .sort((a, b) => a.diff - b.diff)
+                .slice(0, 3);
+
+              const formatDiff = (d) => {
+                const v = (d * 100).toFixed(2);
+                return (v >= 0 ? "+" + v : v) + " p.p.";
+              };
+
+              numTxt += "Columna analizada como contexto: " + col + "\n";
+
+              if (altos.length) {
+                numTxt += "  Valores asociados a una tasa de respuesta favorable mayor que la global:\n";
+                altos.forEach(c => {
+                  const zTxt = (c.z === null) ? "NA" : c.z.toFixed(2);
+                  numTxt +=
+                    "    - " + c.val +
+                    " | n=" + c.n +
+                    ", favorables=" + c.fav +
+                    ", tasa=" + formatPct(c.tasa) +
+                    ", diferencia vs global=" + formatDiff(c.diff) +
+                    ", z≈ " + zTxt + "\n";
+                });
+              } else {
+                numTxt += "  No se observaron valores con tasas claramente superiores a la global (n≥20).\n";
+              }
+
+              if (bajos.length) {
+                numTxt += "  Valores asociados a una tasa de respuesta favorable menor que la global:\n";
+                bajos.forEach(c => {
+                  const zTxt = (c.z === null) ? "NA" : c.z.toFixed(2);
+                  numTxt +=
+                    "    - " + c.val +
+                    " | n=" + c.n +
+                    ", favorables=" + c.fav +
+                    ", tasa=" + formatPct(c.tasa) +
+                    ", diferencia vs global=" + formatDiff(c.diff) +
+                    ", z≈ " + zTxt + "\n";
+                });
+              } else {
+                numTxt += "  No se observaron valores con tasas claramente inferiores a la global (n≥20).\n";
+              }
+
+              numTxt += "\n";
+            });
+
+            numTxt += "Nota: los z-scores son aproximados y sirven como indicador de si la diferencia\n";
+            numTxt += "entre la tasa local y la tasa global podría ser estadísticamente relevante.\n\n";
+          } else {
+            numTxt += "No se detectaron RESPONSE en {01.SUPERIOR, 02.SUPERIOR_TREND};\n";
+            numTxt += "no se construyen tasas de 'respuesta favorable' ni z-scores.\n\n";
+          }
+
+          // 👉 Sección 5
+          numericEl.textContent = numTxt;
+
+          // 👉 Sección 7: gráfico de distribución de RESPONSE (como antes)
+          prepararDatosGrafico({
+            labels: sortedResponses.map(([r]) => r),
+            values: sortedResponses.map(([, c]) => c),
+            datasetLabel: "Número de filas",
+            title: "Distribución de RESPONSE",
+            xLabel: "Valores de RESPONSE",
+            yLabel: "Número de filas"
+          });
+
+          if (usarBackendLLM) {
+            pedirExplicacionDesdeBackend(userPrompt, numTxt, "response_rel");
+            statusEl.textContent =
+              "✅ Análisis RESPONSE vs otras columnas (numérico avanzado) generado. Esperando respuesta del LLM en la sección 6…";
+          }
+        },
+        error: function(err) {
+          statusEl.textContent = "❌ Error al leer el CSV: " + err;
+          numericEl.textContent = "// Error al procesar el archivo.";
+          textEl.textContent = "";
+          prepararDatosGrafico(null);
+        }
+      });
+    }
+
+  </script>
+</body>
+</html>
