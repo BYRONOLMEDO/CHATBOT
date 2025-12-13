@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lan-g="es">
+<html lang="es">
 <head>
     
   <meta charset="utf-8" />
@@ -224,18 +224,15 @@
       activan los <strong>prompts internos</strong> compatibles (comparaciones, blancura, resumen general,
       relación de RESPONSE con las demás columnas o sus variantes avanzadas). Después se ejecuta el análisis:
       el sistema genera un <strong>resumen numérico en el navegador (sección 5)</strong> para que puedas ver
-      la foto técnica de la tabla, pero la explicación extensa de la <strong>sección 6</strong> se construye
-      exclusivamente a partir de tu <strong>prompt de la sección 3</strong> y del modo de análisis elegido,
-      sin utilizar el texto del resumen numérico.
+      la foto técnica de la tabla, y la explicación extensa de la <strong>sección 6</strong> se construye
+      a partir de <strong>métricas estructuradas</strong> calculadas en la sección 5 (no texto libre).
     </p>
 
     <!-- Estado del motor -->
     <div id="llmStatus" class="status small">
-      ℹ️ El análisis numérico se hace en el navegador (sección 5) sólo como referencia técnica.
-      La explicación extensa de la sección 6 se genera en un backend LLM en Hugging Face que usa
-      únicamente tu prompt de la sección 3 (sin leer el texto de la sección 5).
+      ✅ Sección 5 calcula métricas (tasas, contextos críticos, distribuciones).
+      ✅ Sección 6 se genera en el backend por /build_section6 usando JSON estructurado (sin imprimir prompts/mandatos).
     </div>
-
     <!-- Subir CSV (SECCIÓN 1) -->
     <div>
       <div class="section-title">1. Subir archivo CSV</div>
@@ -251,9 +248,8 @@
       <div class="section-title">2. Elegir tipo de análisis y prompt interno</div>
       <p class="small">
         Después de subir el CSV, se mostrarán aquí los tipos de análisis compatibles. Cada tipo activa sus
-        prompts internos. El prompt seleccionado se mostrará en la <strong>sección 3</strong> (puedes editarlo)
-        y se usará como única entrada conceptual para el LLM que genera la explicación de la
-        <strong>sección 6</strong>. La sección 5 queda como apoyo numérico visual para ti.
+        prompts internos. El prompt seleccionado se mostrará en la <strong>sección 3</strong> (puedes editarlo),
+        pero la sección 6 NO imprime mandatos: el backend genera un texto técnico a partir de métricas estructuradas.
       </p>
 
       <div class="mode-options">
@@ -318,15 +314,12 @@
         Primero sube un CSV en la sección 1. Luego se activarán aquí los tipos de análisis compatibles.
       </div>
     </div>
-
     <!-- Pregunta / Prompt (SECCIÓN 3) -->
     <div>
       <div class="section-title">3. Prompt de análisis</div>
       <label for="question">
-        El prompt se rellenará automáticamente según el análisis elegido, pero puedes editarlo libremente.
-        Este texto se enviará al <strong>backend LLM</strong> como instrucción principal para generar
-        la explicación de la sección 6. La sección 5 se mantiene como resumen numérico separado,
-        que el modelo no lee directamente.
+        El prompt se rellena automáticamente según el análisis elegido, pero puedes editarlo.
+        Nota: la sección 6 NO imprime este texto. Se usa solo como metadato (prompt_key/prompt_text).
       </label>
       <textarea id="question" placeholder="Sube un CSV y elige un tipo de análisis; aquí aparecerá el prompt asociado, que podrás ajustar…"></textarea>
       <div class="row">
@@ -343,7 +336,7 @@
     <div>
       <div class="section-title">5. Resultados numéricos (resumen técnico)</div>
       <div id="numericOutput" class="output-box small">
-        // Aquí aparecerán tablas de conteos, máximos por producto, etc. (cálculo interno en el navegador).
+        // Aquí aparecerán tablas de conteos, tasas, contextos críticos, etc. (cálculo interno en el navegador).
       </div>
     </div>
 
@@ -351,10 +344,9 @@
     <div>
       <div class="section-title">6. Explicación en texto continuo (respuesta extendida)</div>
       <div id="textOutput" class="output-box">
-        // Aquí se generará una explicación automática extensa producida por el LLM, usando únicamente tu prompt de análisis (la sección 5 queda como referencia numérica aparte).
+        // Aquí se generará una explicación automática extensa producida por el backend /build_section6 usando JSON estructurado.
       </div>
 
-      <!-- NUEVO: título para el PDF + botón de descarga -->
       <div class="row">
         <div>
           <label for="reportTitle" class="small">
@@ -371,14 +363,12 @@
         </div>
       </div>
     </div>
-
     <!-- NUEVA SECCIÓN 7: gráficos a partir del resumen numérico -->
     <div>
       <div class="section-title">7. Visualización gráfica de los resultados</div>
       <p class="small">
         Estos gráficos se generan automáticamente a partir del resumen numérico de la sección 5.
         Después de ejecutar un análisis, puedes elegir si ver el gráfico en barras o en líneas.
-        El LLM no usa estos gráficos; son una ayuda visual para interpretar los resultados.
       </p>
       <div class="row">
         <div>
@@ -395,21 +385,23 @@
       <div class="chart-wrapper">
         <canvas id="chartCanvas"></canvas>
       </div>
-        <!-- NUEVO: segundo gráfico multivariable -->
+
+      <!-- segundo gráfico multivariable -->
       <div id="chartMultiStatus" class="status">
-        ⚠️ Aún no hay datos para el gráfico multivariable. Ejecuta un análisis compatible (por ejemplo, Comparaciones).
+        ⚠️ Aún no hay datos para el gráfico multivariable. Ejecuta un análisis compatible.
       </div>
       <div class="chart-wrapper">
         <canvas id="chartCanvasMulti"></canvas>
       </div>
     </div>
   </div>
-  <!-- Lógica: CSV + análisis interno + LLM + gráficos + PDF -->
+  <!-- Lógica: CSV + análisis interno + backend section6 + gráficos + PDF -->
   <script>
     // ============================================================
-    //  Backend LLM (FastAPI en Hugging Face) para sección 6
+    //  Backend Section6 (FastAPI) para sección 6
+    //  CAMBIO CLAVE: ahora usamos /build_section6 (no /generate_answer)
     // ============================================================
-    const BACKEND_URL = "https://alexacido-consumetec-llm.hf.space/generate_answer";
+    const BACKEND_URL = "https://alexacido-consumertec-llm.hf.space/build_section6";
 
     // -------------------------------------------------------------
     // Estado global
@@ -419,12 +411,13 @@
     let analysisMode = null;       // 'comparaciones', 'whiteness', 'resumen', 'response_rel'
     let currentPromptKey = null;   // identifica el prompt específico
 
-    // NUEVO: estado gráfico (sección 7)
+    // estado gráfico
     let chartInstance = null;
-    let lastChartData = null;      // { labels, values, datasetLabel, title, xLabel, yLabel }
-       // NUEVO: estado para gráfico multivariable (sección 7)
+    let lastChartData = null;
+
+    // estado gráfico multivariable
     let chartInstanceMulti = null;
-    let lastChartDataMulti = null; // { labels, datasets: [{label, values}], title, xLabel, yLabel }
+    let lastChartDataMulti = null;
 
     // Tipos de análisis detectados como compatibles
     const tiposDisponibles = {
@@ -445,7 +438,6 @@
     const fileStatusEl = document.getElementById("fileStatus");
     const csvLabelEl   = document.getElementById("csvLabel");
     const modeStatusEl = document.getElementById("modeStatus");
-
     // -------------------------------------------------------------
     // Helpers para sección 7 (gráficos)
     // -------------------------------------------------------------
@@ -453,18 +445,12 @@
       lastChartData = data || null;
       const chartStatusEl = document.getElementById("chartStatus");
       if (!lastChartData || !lastChartData.labels || !lastChartData.labels.length) {
-        if (chartStatusEl) {
-          chartStatusEl.textContent = "⚠️ No se generaron datos suficientes para graficar.";
-        }
-        if (chartInstance) {
-          chartInstance.destroy();
-          chartInstance = null;
-        }
+        if (chartStatusEl) chartStatusEl.textContent = "⚠️ No se generaron datos suficientes para graficar.";
+        if (chartInstance) { chartInstance.destroy(); chartInstance = null; }
         return;
       }
       if (chartStatusEl) {
-        chartStatusEl.textContent = "✅ Datos listos para graficar: " +
-          (lastChartData.title || "gráfico a partir del resumen numérico.");
+        chartStatusEl.textContent = "✅ Datos listos para graficar: " + (lastChartData.title || "gráfico.");
       }
       renderChartInternal();
     }
@@ -475,17 +461,12 @@
       const chartStatusEl = document.getElementById("chartStatus");
 
       if (!canvas || !lastChartData || !lastChartData.labels || !lastChartData.labels.length) {
-        if (chartStatusEl) {
-          chartStatusEl.textContent = "⚠️ Aún no hay datos para graficar. Ejecuta un análisis primero.";
-        }
+        if (chartStatusEl) chartStatusEl.textContent = "⚠️ Aún no hay datos para graficar. Ejecuta un análisis primero.";
         return;
       }
 
       const ctx = canvas.getContext("2d");
-      if (chartInstance) {
-        chartInstance.destroy();
-        chartInstance = null;
-      }
+      if (chartInstance) { chartInstance.destroy(); chartInstance = null; }
 
       const tipo = chartTypeEl ? chartTypeEl.value : "bar";
 
@@ -504,70 +485,43 @@
           maintainAspectRatio: false,
           plugins: {
             legend: { display: true },
-            title: {
-              display: !!lastChartData.title,
-              text: lastChartData.title
-            }
+            title: { display: !!lastChartData.title, text: lastChartData.title }
           },
           scales: {
             x: {
-              title: {
-                display: !!lastChartData.xLabel,
-                text: lastChartData.xLabel
-              },
-              ticks: {
-                autoSkip: true,
-                maxRotation: 45,
-                minRotation: 0
-              }
+              title: { display: !!lastChartData.xLabel, text: lastChartData.xLabel },
+              ticks: { autoSkip: true, maxRotation: 45, minRotation: 0 }
             },
             y: {
               beginAtZero: true,
-              title: {
-                display: !!lastChartData.yLabel,
-                text: lastChartData.yLabel
-              }
+              title: { display: !!lastChartData.yLabel, text: lastChartData.yLabel }
             }
           }
         }
       });
 
-      if (chartStatusEl) {
-        chartStatusEl.textContent = "✅ Gráfico actualizado correctamente.";
-      }
+      if (chartStatusEl) chartStatusEl.textContent = "✅ Gráfico actualizado correctamente.";
     }
 
-    function cambiarTipoGrafico() {
-      renderChartInternal();
-    }
+    function cambiarTipoGrafico() { renderChartInternal(); }
     window.cambiarTipoGrafico = cambiarTipoGrafico;
-       // -------------------------------------------------------------
-    // Helpers para gráfico multivariable (segundo gráfico)
+
+    // -------------------------------------------------------------
+    // Helpers para gráfico multivariable
     // -------------------------------------------------------------
     function prepararDatosGraficoMultivariable(data) {
       lastChartDataMulti = data || null;
       const chartMultiStatusEl = document.getElementById("chartMultiStatus");
 
-      if (!lastChartDataMulti ||
-          !lastChartDataMulti.labels ||
-          !lastChartDataMulti.labels.length ||
-          !lastChartDataMulti.datasets ||
-          !lastChartDataMulti.datasets.length) {
-        if (chartMultiStatusEl) {
-          chartMultiStatusEl.textContent =
-            "⚠️ No se generaron datos suficientes para el gráfico multivariable.";
-        }
-        if (chartInstanceMulti) {
-          chartInstanceMulti.destroy();
-          chartInstanceMulti = null;
-        }
+      if (!lastChartDataMulti || !lastChartDataMulti.labels || !lastChartDataMulti.labels.length ||
+          !lastChartDataMulti.datasets || !lastChartDataMulti.datasets.length) {
+        if (chartMultiStatusEl) chartMultiStatusEl.textContent = "⚠️ No se generaron datos suficientes para el gráfico multivariable.";
+        if (chartInstanceMulti) { chartInstanceMulti.destroy(); chartInstanceMulti = null; }
         return;
       }
 
       if (chartMultiStatusEl) {
-        chartMultiStatusEl.textContent =
-          "✅ Datos listos para el gráfico multivariable: " +
-          (lastChartDataMulti.title || "gráfico multivariable a partir del resumen numérico.");
+        chartMultiStatusEl.textContent = "✅ Datos listos para el gráfico multivariable: " + (lastChartDataMulti.title || "gráfico multivariable.");
       }
 
       renderChartMultivariable();
@@ -577,26 +531,15 @@
       const canvas = document.getElementById("chartCanvasMulti");
       const chartMultiStatusEl = document.getElementById("chartMultiStatus");
 
-      if (!canvas ||
-          !lastChartDataMulti ||
-          !lastChartDataMulti.labels ||
-          !lastChartDataMulti.labels.length ||
-          !lastChartDataMulti.datasets ||
-          !lastChartDataMulti.datasets.length) {
-        if (chartMultiStatusEl) {
-          chartMultiStatusEl.textContent =
-            "⚠️ Aún no hay datos para el gráfico multivariable.";
-        }
+      if (!canvas || !lastChartDataMulti || !lastChartDataMulti.labels || !lastChartDataMulti.labels.length ||
+          !lastChartDataMulti.datasets || !lastChartDataMulti.datasets.length) {
+        if (chartMultiStatusEl) chartMultiStatusEl.textContent = "⚠️ Aún no hay datos para el gráfico multivariable.";
         return;
       }
 
       const ctx = canvas.getContext("2d");
-      if (chartInstanceMulti) {
-        chartInstanceMulti.destroy();
-        chartInstanceMulti = null;
-      }
+      if (chartInstanceMulti) { chartInstanceMulti.destroy(); chartInstanceMulti = null; }
 
-      // Para el multivariable dejamos el tipo fijo en 'bar' (barras agrupadas)
       chartInstanceMulti = new Chart(ctx, {
         type: "bar",
         data: {
@@ -612,39 +555,23 @@
           maintainAspectRatio: false,
           plugins: {
             legend: { display: true },
-            title: {
-              display: !!lastChartDataMulti.title,
-              text: lastChartDataMulti.title
-            }
+            title: { display: !!lastChartDataMulti.title, text: lastChartDataMulti.title }
           },
           scales: {
             x: {
-              title: {
-                display: !!lastChartDataMulti.xLabel,
-                text: lastChartDataMulti.xLabel
-              },
-              ticks: {
-                autoSkip: true,
-                maxRotation: 45,
-                minRotation: 0
-              }
+              title: { display: !!lastChartDataMulti.xLabel, text: lastChartDataMulti.xLabel },
+              ticks: { autoSkip: true, maxRotation: 45, minRotation: 0 }
             },
             y: {
               beginAtZero: true,
-              title: {
-                display: !!lastChartDataMulti.yLabel,
-                text: lastChartDataMulti.yLabel
-              }
+              title: { display: !!lastChartDataMulti.yLabel, text: lastChartDataMulti.yLabel }
             }
           }
         }
       });
 
-      if (chartMultiStatusEl) {
-        chartMultiStatusEl.textContent = "✅ Gráfico multivariable actualizado correctamente.";
-      }
+      if (chartMultiStatusEl) chartMultiStatusEl.textContent = "✅ Gráfico multivariable actualizado correctamente.";
     }
-
     // -------------------------------------------------------------
     // Actualizar visibilidad de grupos de prompts
     // -------------------------------------------------------------
@@ -681,20 +608,18 @@
       } else {
         modeStatusEl.textContent =
           "CSV cargado. Análisis disponibles: " + activos.join(" • ") +
-          ". La sección 5 mostrará el resumen numérico y la 6 la interpretación generada con tu prompt.";
+          ". La sección 5 mostrará el resumen numérico y la 6 la interpretación del backend /build_section6.";
       }
     }
 
-    // Inicial
     actualizarDisponibilidadPrompts();
 
     // -------------------------------------------------------------
-    // Manejo de subida de archivo (detecta tipos compatibles)
+    // Manejo de subida de archivo
     // -------------------------------------------------------------
     csvInputEl.addEventListener("change", (ev) => {
       const file = ev.target.files && ev.target.files[0];
 
-      // Reset al cambiar de CSV
       csvFile = null;
       csvHeaders = null;
       analysisMode = null;
@@ -706,27 +631,16 @@
       questionEl.placeholder =
         "Tras subir el CSV y elegir un tipo de análisis en la sección 2, aquí se cargará el prompt correspondiente…";
 
-      // Reset gráfico
+      // Reset gráficos
       lastChartData = null;
-      if (chartInstance) {
-        chartInstance.destroy();
-        chartInstance = null;
-      }
+      if (chartInstance) { chartInstance.destroy(); chartInstance = null; }
       const chartStatusEl = document.getElementById("chartStatus");
-      if (chartStatusEl) {
-        chartStatusEl.textContent = "⚠️ Aún no hay datos para graficar. Ejecuta un análisis primero.";
-      }
-         // NUEVO: reset gráfico multivariable
+      if (chartStatusEl) chartStatusEl.textContent = "⚠️ Aún no hay datos para graficar. Ejecuta un análisis primero.";
+
       lastChartDataMulti = null;
-      if (chartInstanceMulti) {
-        chartInstanceMulti.destroy();
-        chartInstanceMulti = null;
-      }
+      if (chartInstanceMulti) { chartInstanceMulti.destroy(); chartInstanceMulti = null; }
       const chartMultiStatusEl = document.getElementById("chartMultiStatus");
-      if (chartMultiStatusEl) {
-        chartMultiStatusEl.textContent =
-          "⚠️ Aún no hay datos para el gráfico multivariable. Ejecuta un análisis compatible (por ejemplo, Comparaciones).";
-      }
+      if (chartMultiStatusEl) chartMultiStatusEl.textContent = "⚠️ Aún no hay datos para el gráfico multivariable. Ejecuta un análisis compatible.";
 
       if (!file) {
         fileStatusEl.textContent = "⚠️ Ningún archivo seleccionado.";
@@ -798,7 +712,6 @@
       const i = Math.floor(Math.log(bytes) / Math.log(k));
       return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
     }
-
     // -------------------------------------------------------------
     // Validación de columnas según modo
     // -------------------------------------------------------------
@@ -810,11 +723,7 @@
         const needed = ["PRODUCT_TEST", "RESPONSE"];
         const faltantes = needed.filter(c => !set.has(c));
         if (faltantes.length > 0) {
-          return {
-            ok: false,
-            mensaje: "faltan columnas requeridas (" + faltantes.join(", ") +
-                     "). Revisa que sea el CSV de comparaciones (PRODUCT_TEST / RESPONSE)."
-          };
+          return { ok: false, mensaje: "faltan columnas (" + faltantes.join(", ") + ")." };
         }
         return { ok: true, mensaje: "" };
       }
@@ -823,78 +732,58 @@
         const base = ["MONITOR", "PRODUCT"];
         const faltantesBase = base.filter(c => !set.has(c));
         if (faltantesBase.length > 0) {
-          return {
-            ok: false,
-            mensaje: "faltan columnas base " + faltantesBase.join(", ") +
-                     " para análisis de blancura (MONITOR / PRODUCT)."
-          };
+          return { ok: false, mensaje: "faltan columnas base " + faltantesBase.join(", ") + "." };
         }
         const algunaMetrica = whitenessMetrics.some(m => set.has(m));
         if (!algunaMetrica) {
-          return {
-            ok: false,
-            mensaje: "no se encontró ninguna de las métricas de blancura esperadas: " +
-                     whitenessMetrics.join(", ") + "."
-          };
+          return { ok: false, mensaje: "no se encontró ninguna métrica WI esperada." };
         }
         return { ok: true, mensaje: "" };
       }
 
       if (mode === "resumen") {
-        if (!hdr.length) {
-          return { ok: false, mensaje: "el CSV no tiene columnas detectables." };
-        }
+        if (!hdr.length) return { ok: false, mensaje: "el CSV no tiene columnas detectables." };
         return { ok: true, mensaje: "" };
       }
 
       if (mode === "response_rel") {
-        if (!set.has("RESPONSE")) {
-          return {
-            ok: false,
-            mensaje: "no se encuentra la columna RESPONSE, necesaria para este análisis."
-          };
-        }
+        if (!set.has("RESPONSE")) return { ok: false, mensaje: "no se encuentra RESPONSE." };
         return { ok: true, mensaje: "" };
       }
 
-      return { ok: false, mensaje: "modo de análisis no reconocido." };
+      return { ok: false, mensaje: "modo no reconocido." };
     }
 
     // -------------------------------------------------------------
-    // Selección de prompt interno (sección 2)
+    // Selección de prompt interno
     // -------------------------------------------------------------
     function setModeInternal(mode, promptKey) {
       const llmStatusEl = document.getElementById("llmStatus");
       const questionEl  = document.getElementById("question");
 
       if (!csvFile) {
-        modeStatusEl.textContent =
-          "⚠️ Primero sube un CSV en la sección 1. Después podrás elegir el tipo de análisis.";
+        modeStatusEl.textContent = "⚠️ Primero sube un CSV en la sección 1.";
         document.querySelectorAll('input[name="mode"]').forEach(r => { r.checked = false; });
         return;
       }
 
       if (mode === "comparaciones" && !tiposDisponibles.comparaciones) {
-        modeStatusEl.textContent =
-          "❌ El archivo cargado no tiene las columnas necesarias para Comparaciones (PRODUCT_TEST / RESPONSE).";
+        modeStatusEl.textContent = "❌ CSV no compatible con Comparaciones (PRODUCT_TEST/RESPONSE).";
         document.querySelectorAll('input[name="mode"]').forEach(r => { r.checked = false; });
         return;
       }
       if (mode === "whiteness" && !tiposDisponibles.whiteness) {
-        modeStatusEl.textContent =
-          "❌ El archivo cargado no corresponde a un formato de Blancura (MONITOR, PRODUCT y métricas WI).";
+        modeStatusEl.textContent = "❌ CSV no compatible con Blancura (MONITOR/PRODUCT/WI).";
         document.querySelectorAll('input[name="mode"]').forEach(r => { r.checked = false; });
         return;
       }
       if (mode === "resumen" && !tiposDisponibles.resumen) {
-        modeStatusEl.textContent =
-          "❌ El archivo no parece tener estructura válida para un resumen general.";
+        modeStatusEl.textContent = "❌ CSV no compatible con Resumen.";
         document.querySelectorAll('input[name="mode"]').forEach(r => { r.checked = false; });
         return;
       }
       if (mode === "response_rel" && !tiposDisponibles.response_rel) {
-        modeStatusEl.textContent =
-          "❌ El archivo cargado no contiene la columna RESPONSE, necesaria para este análisis.";
+        modeStatusEl.textContent = "❌ CSV no contiene RESPONSE.";
         document.querySelectorAll('input[name="mode"]').forEach(r => { r.checked = false; });
         return;
       }
@@ -902,8 +791,7 @@
       analysisMode = mode;
       currentPromptKey = promptKey || mode;
 
-      questionEl.placeholder =
-        "Prompt oficial cargado para el análisis elegido. Puedes ajustarlo si lo deseas…";
+      questionEl.placeholder = "Prompt cargado (no se imprimirá en sección 6). Puedes editarlo si lo deseas…";
 
       // === TEXTOS DE LOS PROMPTS INTERNOS (igual que tenías) ===
       if (mode === "comparaciones") {
@@ -940,96 +828,65 @@
         }
       }
 
-      let modoTexto = "";
-      if (mode === "comparaciones") modoTexto = "Comparación PRODUCT_TEST vs RESPONSE.";
-      else if (mode === "whiteness") modoTexto = "Blancura por MONITOR.";
-      else if (mode === "resumen") modoTexto = "Resumen general / avanzado.";
-      else if (mode === "response_rel") modoTexto = "RESPONSE vs otras columnas.";
 
-      modeStatusEl.textContent = "✅ Prompt interno seleccionado: " + modoTexto;
-
+      modeStatusEl.textContent = "✅ Prompt interno seleccionado (sección 6 usa métricas estructuradas).";
       if (llmStatusEl) {
         llmStatusEl.textContent =
-          "✅ El resumen numérico se calcula en la sección 5 solo como apoyo visual. " +
-          "La explicación de la sección 6 se generará con tu prompt y el modo de análisis, " +
-          "sin utilizar directamente el texto del resumen numérico.";
+          "✅ Sección 5 calcula métricas estructuradas. ✅ Sección 6 se genera en /build_section6 y NO imprime mandatos/prompt.";
       }
     }
 
     window.setMode = setModeInternal;
-
     // -------------------------------------------------------------
-    // Llamada al backend FastAPI /generate_answer
+    // Llamada al backend /build_section6 (STRUCTURED)
     // -------------------------------------------------------------
-    async function pedirExplicacionDesdeBackend(userPrompt, numericSummary, mode) {
+    async function pedirExplicacionDesdeBackendStructured(payloadObj) {
       const textEl = document.getElementById("textOutput");
       const llmStatusEl = document.getElementById("llmStatus");
-
       if (!textEl) return;
 
-      const pregunta = (userPrompt || "").trim();
-      const resumen  = (numericSummary || "").trim();  // se envía pero el backend lo ignorará
-
-      textEl.textContent = "⏳ Llamando al backend /generate_answer…";
+      textEl.textContent = "⏳ Llamando al backend /build_section6…";
 
       try {
         const resp = await fetch(BACKEND_URL, {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify({
-            mode: mode || "general",
-            question: pregunta,
-            numeric_summary: resumen
-          })
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payloadObj || {})
         });
 
         if (!resp.ok) {
           const msg = "Respuesta HTTP no OK: " + resp.status;
           console.error(msg);
           textEl.textContent =
-            "❌ Error llamando al backend.\n" +
-            msg +
-            "\n\nPuedes revisar el resumen numérico en la sección 5 y, si lo deseas, hacer tu propia interpretación manual.";
-          if (llmStatusEl) {
-            llmStatusEl.textContent = "❌ Backend /generate_answer respondió con error " + resp.status + ".";
-          }
+            "❌ Error llamando al backend.\n" + msg + "\n\n" +
+            "Verifica que el endpoint sea /build_section6 y que el Space esté activo.";
+          if (llmStatusEl) llmStatusEl.textContent = "❌ Backend respondió con error " + resp.status + ".";
           return;
         }
 
         const data = await resp.json();
-        const answer = (data && data.answer) ? String(data.answer).trim() : "";
+        const out = (data && data.section6_text) ? String(data.section6_text).trim() : "";
 
-        if (!answer) {
+        if (!out) {
           textEl.textContent =
-            "⚠️ El backend no devolvió una respuesta de texto utilizable.\n" +
-            "Revisa el resumen numérico en la sección 5 para interpretar manualmente.";
-          if (llmStatusEl) {
-            llmStatusEl.textContent = "⚠️ Backend sin respuesta de texto.";
-          }
+            "⚠️ El backend no devolvió section6_text.\n" +
+            "Revisa que tu app.py retorne {section6_text: ...}.";
+          if (llmStatusEl) llmStatusEl.textContent = "⚠️ Backend sin section6_text.";
         } else {
-          textEl.textContent = answer;
-          if (llmStatusEl) {
-            llmStatusEl.textContent =
-              "✅ Respuesta generada por el backend /generate_answer usando tu prompt (la sección 5 no se ha utilizado como contexto para el modelo).";
-          }
+          textEl.textContent = out;
+          if (llmStatusEl) llmStatusEl.textContent = "✅ Sección 6 generada por /build_section6 (payload estructurado).";
         }
       } catch (err) {
         console.error("Error llamando al backend:", err);
         textEl.textContent =
-          "❌ Error de red al llamar al backend /generate_answer.\n" +
-          "Revisa tu conexión o el estado del Space en Hugging Face.";
-        if (llmStatusEl) {
-          llmStatusEl.textContent = "❌ Error de red hacia el backend.";
-        }
+          "❌ Error de red al llamar al backend /build_section6.\n" +
+          "Revisa conexión y estado del Space.";
+        if (llmStatusEl) llmStatusEl.textContent = "❌ Error de red hacia el backend.";
       }
     }
 
     // -------------------------------------------------------------
     // Botón principal: analizar CSV
-    //   - SIEMPRE: sección 5 numérico en navegador
-    //   - SIEMPRE: sección 6 LLM (solo con el prompt)
     // -------------------------------------------------------------
     function analizarCSVInternal() {
       const statusEl  = document.getElementById("analysisStatus");
@@ -1037,95 +894,49 @@
       const textEl    = document.getElementById("textOutput");
       const question  = document.getElementById("question").value.trim();
 
-      if (!csvFile) {
-        statusEl.textContent = "⚠️ Sube primero el archivo CSV en la sección 1.";
-        return;
-      }
+      if (!csvFile) { statusEl.textContent = "⚠️ Sube primero el CSV."; return; }
+      if (!analysisMode) { statusEl.textContent = "⚠️ Elige un tipo de análisis en la sección 2."; return; }
+      if (!question) { statusEl.textContent = "⚠️ El prompt (sección 3) no puede estar vacío."; return; }
 
-      if (!analysisMode) {
-        statusEl.textContent = "⚠️ Elige un tipo de análisis en la sección 2.";
-        return;
-      }
+      statusEl.textContent = "⏳ Analizando CSV (sección 5) y preparando payload estructurado para sección 6…";
+      numericEl.textContent = "// Procesando CSV para generar el resumen técnico…";
+      textEl.textContent = "// Esperando respuesta del backend (sección 6)…";
 
-      if (!question) {
-        statusEl.textContent = "⚠️ El prompt de análisis (sección 3) no puede estar vacío.";
-        return;
-      }
-
-      statusEl.textContent =
-        "⏳ Analizando CSV en el navegador (sección 5) y preparando la llamada al LLM con tu prompt…";
-
-      numericEl.textContent =
-        "// Procesando CSV para generar el resumen técnico…";
-      textEl.textContent =
-        "// Esperando respuesta del LLM (sección 6)…";
-
-      // Reset gráfico antes de cada nuevo análisis
+      // Reset gráficos
       lastChartData = null;
-      if (chartInstance) {
-        chartInstance.destroy();
-        chartInstance = null;
-      }
+      if (chartInstance) { chartInstance.destroy(); chartInstance = null; }
       const chartStatusEl = document.getElementById("chartStatus");
-      if (chartStatusEl) {
-        chartStatusEl.textContent = "⏳ Preparando datos para posibles gráficos…";
-      }
-        // NUEVO: reset gráfico multivariable antes de cada nuevo análisis
+      if (chartStatusEl) chartStatusEl.textContent = "⏳ Preparando datos para posibles gráficos…";
+
       lastChartDataMulti = null;
-      if (chartInstanceMulti) {
-        chartInstanceMulti.destroy();
-        chartInstanceMulti = null;
-      }
+      if (chartInstanceMulti) { chartInstanceMulti.destroy(); chartInstanceMulti = null; }
       const chartMultiStatusEl = document.getElementById("chartMultiStatus");
-      if (chartMultiStatusEl) {
-        chartMultiStatusEl.textContent =
-          "⏳ Preparando datos para el gráfico multivariable (si el modo lo soporta)…";
-      }        
-      const usarBackendLLM = true;  // SIEMPRE LLM para la explicación
+      if (chartMultiStatusEl) chartMultiStatusEl.textContent = "⏳ Preparando datos para el gráfico multivariable…";
 
       if (analysisMode === "whiteness") {
-        analizarBlancura(statusEl, numericEl, textEl, question, usarBackendLLM);
+        analizarBlancura(statusEl, numericEl, textEl, question);
       } else if (analysisMode === "comparaciones") {
-        analizarComparaciones(statusEl, numericEl, textEl, question, usarBackendLLM);
+        analizarComparaciones(statusEl, numericEl, textEl, question);
       } else if (analysisMode === "resumen") {
-        analizarResumen(statusEl, numericEl, textEl, question, usarBackendLLM);
+        analizarResumen(statusEl, numericEl, textEl, question);
       } else if (analysisMode === "response_rel") {
-        analizarResponseVsOtros(statusEl, numericEl, textEl, question, usarBackendLLM);
+        analizarResponseVsOtros(statusEl, numericEl, textEl, question);
       }
     }
 
     window.analizarCSV = analizarCSVInternal;
-
- // -------------------------------------------------------------
-// Modo 1: Comparaciones PRODUCT_TEST vs RESPONSE (versión avanzada)
-//   - Mantiene los recuentos absolutos
-//   - Añade tasas de desempeño por producto
-//   - Estima significancia (z-score vs tasa global)
-//   - Analiza contextos (MODALITY, SCENARIOS, WASH, PROCESS)
-//     como posibles efectos de confusión
-//   - Explicita medidas cuantitativas directas de desempeño
-//     e información sobre variabilidad interna e interacciones
 // -------------------------------------------------------------
-function analizarComparaciones(statusEl, numericEl, textEl, userPrompt, usarBackendLLM) {
+// Modo 1: Comparaciones (igual a tu lógica, pero ahora ENVÍA payload estructurado)
+// -------------------------------------------------------------
+function analizarComparaciones(statusEl, numericEl, textEl, userPrompt) {
   const objetivos = new Set(["01.SUPERIOR", "02.SUPERIOR_TREND"]);
-
-  // Favorables por PRODUCT_TEST (como antes)
   const conteosFavorables = {};
-  // Total de comparaciones por PRODUCT_TEST (para tasas)
   const totalPorProducto = {};
+  const contextoStats = { MODALITY: {}, SCENARIOS: {}, WASH: {}, PROCESS: {} };
 
-  // Contextos para interrelación / posibles efectos de confusión
-  // Para cada variable de contexto guardamos total y favorables
-  const contextoStats = {
-    MODALITY: {},
-    SCENARIOS: {},
-    WASH: {},
-    PROCESS: {}
-  };
-
-  let totalFilas = 0;        // filas totales leídas del CSV
-  let totalComparaciones = 0; // filas con PRODUCT_TEST definido
-  let totalFiltradas = 0;    // filas con RESPONSE favorable
+  let totalFilas = 0;
+  let totalComparaciones = 0;
+  let totalFiltradas = 0;
 
   Papa.parse(csvFile, {
     header: true,
@@ -1138,7 +949,7 @@ function analizarComparaciones(statusEl, numericEl, textEl, userPrompt, usarBack
         totalFilas++;
 
         const ptestRaw = row["PRODUCT_TEST"];
-        const ptest = (ptestRaw || "").trim() || "(VACÍO)";
+        const ptest = (ptestRaw || "").trim() || "(EMPTY)";
         if (ptest) {
           totalComparaciones++;
           totalPorProducto[ptest] = (totalPorProducto[ptest] || 0) + 1;
@@ -1149,61 +960,38 @@ function analizarComparaciones(statusEl, numericEl, textEl, userPrompt, usarBack
 
         if (esFavorable) {
           totalFiltradas++;
-          if (ptest) {
-            conteosFavorables[ptest] = (conteosFavorables[ptest] || 0) + 1;
-          }
+          if (ptest) conteosFavorables[ptest] = (conteosFavorables[ptest] || 0) + 1;
         }
 
-        // Actualizar contextos: MODALITY, SCENARIOS, WASH, PROCESS
         for (const ctxName of Object.keys(contextoStats)) {
-          const vRaw = row[ctxName];
-          const v = (vRaw || "").trim() || "(VACÍO)";
-          if (!contextoStats[ctxName][v]) {
-            contextoStats[ctxName][v] = { total: 0, fav: 0 };
-          }
+          const v = ((row[ctxName] || "").trim()) || "(EMPTY)";
+          if (!contextoStats[ctxName][v]) contextoStats[ctxName][v] = { total: 0, fav: 0 };
           contextoStats[ctxName][v].total++;
-          if (esFavorable) {
-            contextoStats[ctxName][v].fav++;
-          }
+          if (esFavorable) contextoStats[ctxName][v].fav++;
         }
       }
     },
     complete: function() {
       if (!Object.keys(conteosFavorables).length) {
-        statusEl.textContent = "❌ No se encontraron filas con RESPONSE = 01.SUPERIOR o 02.SUPERIOR_TREND.";
+        statusEl.textContent = "❌ No se encontraron filas con RESPONSE favorable.";
         numericEl.textContent = "// Sin resultados favorables para PRODUCT_TEST.";
-        textEl.textContent = "// No hay suficientes datos favorables para generar una conclusión con el LLM.";
+        textEl.textContent = "// Sin datos suficientes.";
         prepararDatosGrafico(null);
+        prepararDatosGraficoMultivariable(null);
         return;
       }
 
-      // -------------------------------------------------------
-      // 1) Medidas básicas globales
-      // -------------------------------------------------------
-      const totalFavorables = Object.values(conteosFavorables)
-        .reduce((s, c) => s + c, 0);
+      const totalFavorables = Object.values(conteosFavorables).reduce((s, c) => s + c, 0);
+      const tasaGlobal = (totalComparaciones > 0) ? (totalFavorables / totalComparaciones) : 0;
 
-      const tasaGlobal = (totalComparaciones > 0)
-        ? (totalFavorables / totalComparaciones)
-        : 0;
-
-      // Helper para porcentajes
       const formatPct = (v) => (v * 100).toFixed(2) + "%";
-
-      // -------------------------------------------------------
-      // 2) Medidas cuantitativas de desempeño por PRODUCT_TEST
-      //    (tasa favorable, diferencia vs global, z-score, IC)
-      // -------------------------------------------------------
       const productos = Object.keys(totalPorProducto).map(prod => {
         const n = totalPorProducto[prod] || 0;
         const k = conteosFavorables[prod] || 0;
         const tasa = n > 0 ? (k / n) : 0;
         const diff = tasa - tasaGlobal;
 
-        let z = null;
-        let ciLow = null;
-        let ciHigh = null;
-
+        let z = null, ciLow = null, ciHigh = null;
         if (n > 0 && tasaGlobal > 0 && tasaGlobal < 1) {
           const se = Math.sqrt(tasaGlobal * (1 - tasaGlobal) / n);
           if (se > 0) {
@@ -1213,169 +1001,73 @@ function analizarComparaciones(statusEl, numericEl, textEl, userPrompt, usarBack
             ciHigh = tasa + half;
           }
         }
-
         return { prod, n, k, tasa, diff, z, ciLow, ciHigh };
-      });
+      }).sort((a,b) => b.tasa - a.tasa);
 
-      // Ordenamos por tasa favorable descendente
-      productos.sort((a, b) => b.tasa - a.tasa);
-
-      // -------------------------------------------------------
-      // 3) Interrelación y posibles efectos de confusión
-      //    (contextos con tasas muy altas o muy bajas)
-      // -------------------------------------------------------
+      // contextos críticos (altos/bajos) con z-score aprox
       const contextoResumen = [];
-
       for (const ctxName of Object.keys(contextoStats)) {
         const mapa = contextoStats[ctxName];
         const arr = Object.entries(mapa).map(([valor, st]) => {
           const tasaCtx = st.total > 0 ? (st.fav / st.total) : 0;
           const diffCtx = tasaCtx - tasaGlobal;
-          return {
-            valor,
-            total: st.total,
-            fav: st.fav,
-            tasa: tasaCtx,
-            diff: diffCtx
-          };
-        });
+          let z = null;
+          if (st.total > 1 && tasaGlobal > 0 && tasaGlobal < 1) {
+            const se = Math.sqrt(tasaGlobal * (1 - tasaGlobal) / st.total);
+            if (se > 0) z = diffCtx / se;
+          }
+          return { valor, total: st.total, fav: st.fav, tasa: tasaCtx, diff: diffCtx, z };
+        }).filter(x => x.total >= 20);
 
-        // Filtramos para evitar ruido extremo (muy pocos casos)
-        const arrFiltrado = arr.filter(x => x.total >= 20);
-
-        // Contextos con tasas muy por encima de la media
-        const topAltos = arrFiltrado
-          .filter(x => x.diff > 0)
-          .sort((a, b) => b.diff - a.diff)
-          .slice(0, 3);
-
-        // Contextos con tasas muy por debajo de la media
-        const topBajos = arrFiltrado
-          .filter(x => x.diff < 0)
-          .sort((a, b) => a.diff - b.diff)
-          .slice(0, 3);
-
-        contextoResumen.push({
-          ctxName,
-          altos: topAltos,
-          bajos: topBajos
-        });
+        const altos = arr.filter(x => x.diff > 0).sort((a,b)=>b.diff-a.diff).slice(0,3);
+        const bajos = arr.filter(x => x.diff < 0).sort((a,b)=>a.diff-b.diff).slice(0,3);
+        contextoResumen.push({ ctxName, altos, bajos });
       }
 
-      // -------------------------------------------------------
-      // 4) Construcción del TEXTO de la sección 5
-      // -------------------------------------------------------
+      // Sección 5 (tu texto grande)
       let numTxt = "";
+      numTxt += "PANORAMA GLOBAL\n";
+      numTxt += "--------------\n";
+      numTxt += "Total filas: " + totalFilas + "\n";
+      numTxt += "Total comparaciones (PRODUCT_TEST): " + totalComparaciones + "\n";
+      numTxt += "Total favorables: " + totalFiltradas + "\n";
+      numTxt += "Tasa global favorable: " + formatPct(tasaGlobal) + "\n\n";
 
-      // 🔹 BLOQUE EXPLÍCITO: medidas de desempeño + variabilidad + interacciones
-      numTxt += "CAPACIDAD ANALÍTICA DISPONIBLE EN ESTE MODO (COMPARACIONES)\n";
-      numTxt += "================================================================\n";
-      numTxt += "- Medidas cuantitativas directas de desempeño más allá de la tasa global:\n";
-      numTxt += "  • Tasas favorables específicas por PRODUCT_TEST (k/n) y su diferencia\n";
-      numTxt += "    frente a la tasa global de éxito.\n";
-      numTxt += "  • Intervalos de confianza aproximados (IC 95%) por producto para acotar\n";
-      numTxt += "    la magnitud esperada de rendimiento.\n";
-      numTxt += "- Información sobre variabilidad interna e interacciones entre variables:\n";
-      numTxt += "  • La comparación simultánea de PRODUCT_TEST con MODALITY, SCENARIOS,\n";
-      numTxt += "    WASH y PROCESS permite evaluar cómo cambia el desempeño del producto\n";
-      numTxt += "    según el contexto experimental.\n";
-      numTxt += "  • Las diferencias de tasa entre contextos funcionan como indicador de\n";
-      numTxt += "    posibles interacciones y efectos de confusión (escenarios que inflan\n";
-      numTxt += "    o deprimen artificialmente el rendimiento observado).\n\n";
-
-      // 4.1 Panorama global
-      numTxt += "PANORAMA GLOBAL DE LAS COMPARACIONES\n";
-      numTxt += "------------------------------------\n";
-      numTxt += "Total de filas leídas en el CSV: " + totalFilas + "\n";
-      numTxt += "Total de comparaciones con PRODUCT_TEST definido: " + totalComparaciones + "\n";
-      numTxt += "Filas con RESPONSE en {01.SUPERIOR, 02.SUPERIOR_TREND}: " + totalFiltradas + "\n";
-      numTxt += "Tasa global de resultados favorables: " + formatPct(tasaGlobal) + "\n\n";
-
-      // 4.2 Medidas cuantitativas por producto
-      numTxt += "MEDIDAS CUANTITATIVAS DE DESEMPEÑO POR PRODUCT_TEST\n";
-      numTxt += "---------------------------------------------------\n";
-      numTxt += "Ordenado por tasa favorable (k/n), con indicador de significancia aproximada vs tasa global.\n";
-      numTxt += "Las tasas se expresan como proporción de comparaciones en las que el producto resulta favorable.\n\n";
-      numTxt += "Producto | n total | k favorables | Tasa favorable | Diferencia vs global | z-score | IC 95% aprox.\n";
-      numTxt += "---------|---------|-------------|----------------|----------------------|---------|----------------\n";
-
+      numTxt += "DESEMPEÑO POR PRODUCT_TEST (k/n)\n";
+      numTxt += "-------------------------------\n";
+      numTxt += "Producto | n | k | Tasa | Δ vs global | z | IC95%\n";
+      numTxt += "--------|---|---|------|------------|---|------\n";
       productos.forEach(p => {
-        const diffPct = (p.diff * 100).toFixed(2);
         const zTxt = (p.z === null) ? "NA" : p.z.toFixed(2);
-
         let icTxt = "NA";
         if (p.ciLow !== null && p.ciHigh !== null) {
-          const low = Math.max(0, Math.min(1, p.ciLow));
-          const high = Math.max(0, Math.min(1, p.ciHigh));
-          icTxt = "[" + formatPct(low) + " ; " + formatPct(high) + "]";
+          const lo = Math.max(0, Math.min(1, p.ciLow));
+          const hi = Math.max(0, Math.min(1, p.ciHigh));
+          icTxt = "[" + formatPct(lo) + " ; " + formatPct(hi) + "]";
         }
-
-        numTxt +=
-          p.prod + " | " +
-          p.n + " | " +
-          p.k + " | " +
-          formatPct(p.tasa) + " | " +
-          (diffPct >= 0 ? "+" + diffPct : diffPct) + " p.p. | " +
-          zTxt + " | " +
-          icTxt + "\n";
+        numTxt += `${p.prod} | ${p.n} | ${p.k} | ${formatPct(p.tasa)} | ${(p.diff*100>=0?"+":"")}${(p.diff*100).toFixed(2)} p.p. | ${zTxt} | ${icTxt}\n`;
       });
-
-      numTxt += "\n";
-      numTxt += "Interpretación rápida del z-score:\n";
-      numTxt += "- |z| ≈ 0–1.5: diferencias pequeñas o poco claras.\n";
-      numTxt += "- |z| ≈ 1.5–2.0: tendencia a diferencia, pero con incertidumbre.\n";
-      numTxt += "- |z| ≥ 2.0: posible diferencia estadísticamente relevante frente a la tasa global.\n\n";
-
-      // 4.3 Interrelación entre variables y posibles efectos de confusión
-      numTxt += "INTERRELACIÓN ENTRE VARIABLES Y POSIBLES EFECTOS DE CONFUSIÓN\n";
-      numTxt += "------------------------------------------------------------\n";
-      numTxt += "Se exploran MODALITY, SCENARIOS, WASH y PROCESS como contextos que pueden favorecer o penalizar\n";
-      numTxt += "la tasa de resultados favorables frente a la tasa global.\n\n";
-
+      numTxt += "\nCONTEXTOS CRÍTICOS (MODALITY/SCENARIOS/WASH/PROCESS)\n";
+      numTxt += "---------------------------------------------------\n";
       contextoResumen.forEach(ctx => {
-        numTxt += "Variable de contexto: " + ctx.ctxName + "\n";
-
-        if (ctx.altos.length) {
-          numTxt += "  Contextos con tasa favorable claramente superior a la media global:\n";
-          ctx.altos.forEach(c => {
-            const diffPct = (c.diff * 100).toFixed(2);
-            numTxt +=
-              "    - " + c.valor +
-              " | n=" + c.total +
-              ", favorables=" + c.fav +
-              ", tasa=" + formatPct(c.tasa) +
-              ", diferencia vs global=" +
-              (diffPct >= 0 ? "+" + diffPct : diffPct) + " p.p.\n";
-          });
-        } else {
-          numTxt += "  No se observaron contextos con tasas muy por encima de la media (con n≥20).\n";
-        }
-
-        if (ctx.bajos.length) {
-          numTxt += "  Contextos con tasa favorable claramente por debajo de la media global:\n";
-          ctx.bajos.forEach(c => {
-            const diffPct = (c.diff * 100).toFixed(2);
-            numTxt +=
-              "    - " + c.valor +
-              " | n=" + c.total +
-              ", favorables=" + c.fav +
-              ", tasa=" + formatPct(c.tasa) +
-              ", diferencia vs global=" + diffPct + " p.p.\n";
-          });
-        } else {
-          numTxt += "  No se observaron contextos con tasas muy por debajo de la media (con n≥20).\n";
-        }
-
+        numTxt += "CTX: " + ctx.ctxName + "\n";
+        numTxt += "  ALTOS:\n";
+        (ctx.altos.length?ctx.altos:[{valor:"(none)",total:0,fav:0,tasa:0,diff:0,z:null}]).forEach(c=>{
+          const zt = (c.z===null||c.z===undefined)?"NA":Number(c.z).toFixed(2);
+          numTxt += `    - ${c.valor} | n=${c.total} | fav=${c.fav} | tasa=${formatPct(c.tasa)} | Δ=${(c.diff*100>=0?"+":"")}${(c.diff*100).toFixed(2)} p.p. | z≈${zt}\n`;
+        });
+        numTxt += "  BAJOS:\n";
+        (ctx.bajos.length?ctx.bajos:[{valor:"(none)",total:0,fav:0,tasa:0,diff:0,z:null}]).forEach(c=>{
+          const zt = (c.z===null||c.z===undefined)?"NA":Number(c.z).toFixed(2);
+          numTxt += `    - ${c.valor} | n=${c.total} | fav=${c.fav} | tasa=${formatPct(c.tasa)} | Δ=${(c.diff*100>=0?"+":"")}${(c.diff*100).toFixed(2)} p.p. | z≈${zt}\n`;
+        });
         numTxt += "\n";
       });
 
-      // 👉 Sección 5 SIEMPRE usa este cálculo interno enriquecido
       numericEl.textContent = numTxt;
 
-      // 👉 Sección 7: gráfico de barras/líneas de conteos por PRODUCT_TEST (como antes)
-      const ordenadosPorFavorable = Object.entries(conteosFavorables)
-        .sort((a, b) => b[1] - a[1]);
-
+      // gráfico 1
+      const ordenadosPorFavorable = Object.entries(conteosFavorables).sort((a, b) => b[1] - a[1]);
       prepararDatosGrafico({
         labels: ordenadosPorFavorable.map(([prod]) => prod),
         values: ordenadosPorFavorable.map(([, cnt]) => cnt),
@@ -1384,588 +1076,459 @@ function analizarComparaciones(statusEl, numericEl, textEl, userPrompt, usarBack
         xLabel: "PRODUCT_TEST",
         yLabel: "Número de resultados favorables"
       });
-         // 👉 NUEVO: gráfico multivariable (sección 7) para el modo Comparaciones
-      //     - Serie 1: tasa favorable (%) por PRODUCT_TEST
-      //     - Serie 2: número total de comparaciones por PRODUCT_TEST
-      const labelsMulti = productos.map(p => p.prod);
-      const valuesTasa = productos.map(p => p.tasa * 100);  // porcentaje
-      const valuesN = productos.map(p => p.n);              // número de comparaciones
 
+      // gráfico 2 multivariable
       prepararDatosGraficoMultivariable({
-        labels: labelsMulti,
+        labels: productos.map(p => p.prod),
         datasets: [
-          {
-            label: "Tasa favorable (%)",
-            values: valuesTasa
-          },
-          {
-            label: "Número total de comparaciones",
-            values: valuesN
-          }
+          { label: "Tasa favorable (%)", values: productos.map(p => p.tasa * 100) },
+          { label: "Número total de comparaciones", values: productos.map(p => p.n) }
         ],
-        title: "Tasa favorable (%) y nº de comparaciones por PRODUCT_TEST",
+        title: "Tasa favorable (%) y nº comparaciones por PRODUCT_TEST",
         xLabel: "PRODUCT_TEST",
-        yLabel: "Escala relativa (tasa % y conteos)"
+        yLabel: "Escala relativa"
       });
 
+      // ✅ Payload estructurado a backend
+      const payload = {
+        mode: "comparaciones",
+        prompt_key: currentPromptKey,
+        prompt_text: userPrompt,
+        totalFilas: totalFilas,
+        totalComparaciones: totalComparaciones,
+        totalFavorables: totalFiltradas,
+        tasaGlobal: tasaGlobal,
+        productos: productos,
+        with_titles: true,
+        detail_level: 3,
+        min_words: 1200,
+        contextos: contextoResumen
+      };
 
-      if (usarBackendLLM) {
-        // numeric_summary lleva TODO este contenido enriquecido a /generate_answer
-        pedirExplicacionDesdeBackend(userPrompt, numTxt, "comparaciones");
-        statusEl.textContent =
-          "✅ Análisis de comparaciones numérico avanzado generado. " +
-          "Esperando respuesta del LLM en la sección 6…";
-      }
+      pedirExplicacionDesdeBackendStructured(payload);
+      statusEl.textContent = "✅ Comparaciones: sección 5 lista. Sección 6 generándose con /build_section6…";
     },
     error: function(err) {
       statusEl.textContent = "❌ Error al leer el CSV: " + err;
       numericEl.textContent = "// Error al procesar el archivo.";
       textEl.textContent = "";
       prepararDatosGrafico(null);
+      prepararDatosGraficoMultivariable(null);
     }
   });
 }
 
+// -------------------------------------------------------------
+// Modo 2: Blancura (lo dejo igual en esencia, solo: arma payload estructurado)
+// -------------------------------------------------------------
+function analizarBlancura(statusEl, numericEl, textEl, userPrompt) {
+  const dataMax = {};
+  const globalAgg = {};
+  const prodAgg = {};
+  const globalCountsMax = {};
 
-       // -------------------------------------------------------------
-    // Modo 2: Blancura por MONITOR (versión avanzada)
-    //   - Mantiene máximos por MONITOR y métrica (como antes)
-    //   - Añade medias globales y por PRODUCT para cada métrica
-    //   - Estima significancia (z-score) de la media por producto
-    //     frente a la media global para cada métrica
-    //   - Analiza MONITOR como posible fuente de confusión
-    // -------------------------------------------------------------
-    function analizarBlancura(statusEl, numericEl, textEl, userPrompt, usarBackendLLM) {
-      const dataMax = {};           // máximos por MONITOR y métrica
-      const globalAgg = {};         // métrica -> {sum, sumsq, count}
-      const prodAgg = {};           // PRODUCT -> métrica -> {sum, sumsq, count}
-      const monitorAgg = {};        // MONITOR -> métrica -> {sum, sumsq, count}
-      const globalCountsMax = {};   // conteo de apariciones como máximo (como antes)
+  let totalFilas = 0;
 
-      let totalFilas = 0;
+  const ensureAgg = (agg, key1, key2) => {
+    if (!agg[key1]) agg[key1] = {};
+    if (!agg[key1][key2]) agg[key1][key2] = { sum: 0, sumsq: 0, count: 0 };
+    return agg[key1][key2];
+  };
 
-      const ensureAgg = (agg, key1, key2) => {
-        if (!agg[key1]) agg[key1] = {};
-        if (!agg[key1][key2]) agg[key1][key2] = { sum: 0, sumsq: 0, count: 0 };
-        return agg[key1][key2];
+  Papa.parse(csvFile, {
+    header: true,
+    skipEmptyLines: true,
+    worker: false,
+    chunkSize: 1024 * 1024,
+    chunk: function(results) {
+      const rows = results.data;
+      for (const row of rows) {
+        totalFilas++;
+        const monitor = (row["MONITOR"] || "").trim();
+        const product = (row["PRODUCT"] || "").trim();
+        if (!monitor || !product) continue;
+
+        for (const m of whitenessMetrics) {
+          if (!(m in row)) continue;
+          const v = parseFloat(row[m]);
+          if (Number.isNaN(v)) continue;
+
+          if (!globalAgg[m]) globalAgg[m] = { sum: 0, sumsq: 0, count: 0 };
+          globalAgg[m].sum += v;
+          globalAgg[m].sumsq += v * v;
+          globalAgg[m].count++;
+
+          const pa = ensureAgg(prodAgg, product, m);
+          pa.sum += v;
+          pa.sumsq += v * v;
+          pa.count++;
+
+          if (!dataMax[monitor]) dataMax[monitor] = {};
+          if (!dataMax[monitor][m]) dataMax[monitor][m] = { max: null, rows: [] };
+          const entry = dataMax[monitor][m];
+          if (entry.max === null || v > entry.max) {
+            entry.max = v;
+            entry.rows = [{ PRODUCT: product, VALUE: v }];
+          } else if (v === entry.max) {
+            entry.rows.push({ PRODUCT: product, VALUE: v });
+          }
+        }
+      }
+    },
+    complete: function() {
+      if (!Object.keys(globalAgg).length) {
+        statusEl.textContent = "❌ No se encontraron datos válidos de blancura.";
+        numericEl.textContent = "// Sin resultados WI.";
+        textEl.textContent = "// Sin datos suficientes.";
+        prepararDatosGrafico(null);
+        prepararDatosGraficoMultivariable(null);
+        return;
+      }
+
+      const globalStats = {};
+      for (const m of Object.keys(globalAgg)) {
+        const g = globalAgg[m];
+        const mean = g.count > 0 ? (g.sum / g.count) : 0;
+        const varv = g.count > 0 ? Math.max(0, (g.sumsq / g.count) - mean * mean) : 0;
+        const sd = Math.sqrt(varv);
+        globalStats[m] = { mean, sd, count: g.count };
+      }
+
+      const productosWhiteness = {};
+      for (const product of Object.keys(prodAgg)) {
+        const metrics = prodAgg[product];
+        for (const m of Object.keys(metrics)) {
+          const a = metrics[m];
+          const g = globalStats[m];
+          if (!g || g.count === 0) continue;
+          const meanProd = a.count > 0 ? (a.sum / a.count) : 0;
+          const diff = meanProd - g.mean;
+
+          let z = null;
+          if (a.count > 1 && g.sd > 0) {
+            const se = g.sd / Math.sqrt(a.count);
+            if (se > 0) z = diff / se;
+          }
+
+          if (!productosWhiteness[m]) productosWhiteness[m] = [];
+          productosWhiteness[m].push({ product, n: a.count, mean: meanProd, diff, z });
+        }
+      }
+      for (const m of Object.keys(productosWhiteness)) {
+        productosWhiteness[m].sort((a,b)=>b.mean-a.mean);
+      }
+
+      // máximos
+      for (const monitor of Object.keys(dataMax)) {
+        const metricsObj = dataMax[monitor];
+        for (const metric of Object.keys(metricsObj)) {
+          const info = metricsObj[metric];
+          for (const row of info.rows) {
+            const prod = row.PRODUCT || "(EMPTY)";
+            globalCountsMax[prod] = (globalCountsMax[prod] || 0) + 1;
+          }
+        }
+      }
+      const topMaxApariciones = Object.entries(globalCountsMax)
+        .sort((a,b)=>b[1]-a[1])
+        .map(([product,cnt])=>({product,cnt}));
+
+      // sección 5 (compacta, pero útil)
+      let numTxt = "";
+      numTxt += "GLOBAL STATS (WI)\n";
+      numTxt += "-----------------\n";
+      numTxt += "Total filas: " + totalFilas + "\n\n";
+      for (const m of whitenessMetrics) {
+        const g = globalStats[m];
+        if (!g) continue;
+        numTxt += `${m} | n=${g.count} | mean≈${g.mean.toFixed(3)} | sd≈${g.sd.toFixed(3)}\n`;
+      }
+      numTxt += "\nTOP MAX APPEARANCES (by PRODUCT)\n";
+      topMaxApariciones.slice(0,20).forEach(x=>{
+        numTxt += `  - ${x.product}: ${x.cnt}\n`;
+      });
+
+      numericEl.textContent = numTxt;
+
+      prepararDatosGrafico({
+        labels: topMaxApariciones.slice(0,30).map(x => x.product),
+        values: topMaxApariciones.slice(0,30).map(x => x.cnt),
+        datasetLabel: "Max appearances",
+        title: "Apariciones como máximo por PRODUCT",
+        xLabel: "PRODUCT",
+        yLabel: "Count"
+      });
+
+      // (opcional) multivariable para whiteness: no lo fuerzo
+      prepararDatosGraficoMultivariable(null);
+
+      const payload = {
+        mode: "whiteness",
+        prompt_key: currentPromptKey,
+        prompt_text: userPrompt,
+        totalFilas: totalFilas,
+        globalStats: globalStats,
+        topMaxApariciones: topMaxApariciones,
+        with_titles: true,
+        detail_level: 3,
+        min_words: 1200,
+        productosWhiteness: productosWhiteness
       };
 
-      Papa.parse(csvFile, {
-        header: true,
-        skipEmptyLines: true,
-        worker: false,
-        chunkSize: 1024 * 1024,
-        chunk: function(results) {
-          const rows = results.data;
-          for (const row of rows) {
-            totalFilas++;
-            const monitor = (row["MONITOR"] || "").trim();
-            const product = (row["PRODUCT"] || "").trim();
-            if (!monitor || !product) continue;
-
-            for (const m of whitenessMetrics) {
-              if (!(m in row)) continue;
-              const v = parseFloat(row[m]);
-              if (Number.isNaN(v)) continue;
-
-              // Global
-              if (!globalAgg[m]) {
-                globalAgg[m] = { sum: 0, sumsq: 0, count: 0 };
-              }
-              globalAgg[m].sum += v;
-              globalAgg[m].sumsq += v * v;
-              globalAgg[m].count++;
-
-              // Por producto
-              const pa = ensureAgg(prodAgg, product, m);
-              pa.sum += v;
-              pa.sumsq += v * v;
-              pa.count++;
-
-              // Por monitor
-              const ma = ensureAgg(monitorAgg, monitor, m);
-              ma.sum += v;
-              ma.sumsq += v * v;
-              ma.count++;
-
-              // Máximos por monitor/métrica (como antes)
-              if (!dataMax[monitor]) dataMax[monitor] = {};
-              if (!dataMax[monitor][m]) dataMax[monitor][m] = { max: null, rows: [] };
-
-              const entry = dataMax[monitor][m];
-              if (entry.max === null || v > entry.max) {
-                entry.max = v;
-                entry.rows = [{
-                  PRODUCT: product,
-                  MODALITY: row["MODALITY"] || "",
-                  SCENARIOS: row["SCENARIOS"] || "",
-                  WASH: row["WASH"] || "",
-                  PROCESS: row["PROCESS"] || "",
-                  VALUE: v
-                }];
-              } else if (v === entry.max) {
-                entry.rows.push({
-                  PRODUCT: product,
-                  MODALITY: row["MODALITY"] || "",
-                  SCENARIOS: row["SCENARIOS"] || "",
-                  WASH: row["WASH"] || "",
-                  PROCESS: row["PROCESS"] || "",
-                  VALUE: v
-                });
-              }
-            }
-          }
-        },
-        complete: function() {
-          if (!Object.keys(globalAgg).length) {
-            statusEl.textContent = "❌ No se encontraron datos válidos de blancura por MONITOR.";
-            numericEl.textContent = "// Sin resultados de métricas de blancura.";
-            textEl.textContent = "// No hay suficientes datos de blancura para generar una conclusión con el LLM.";
-            prepararDatosGrafico(null);
-            return;
-          }
-
-          const formatPct = (v) => (v * 100).toFixed(2) + "%";
-
-          // -----------------------------------------
-          // 1) Estadísticos globales por métrica
-          // -----------------------------------------
-          const globalStats = {}; // m -> {mean, sd, count}
-          for (const m of Object.keys(globalAgg)) {
-            const g = globalAgg[m];
-            const mean = g.count > 0 ? (g.sum / g.count) : 0;
-            const varv = g.count > 0 ? Math.max(0, (g.sumsq / g.count) - mean * mean) : 0;
-            const sd = Math.sqrt(varv);
-            globalStats[m] = { mean, sd, count: g.count };
-          }
-
-          // -----------------------------------------
-          // 2) Perfil cuantitativo por PRODUCT
-          // -----------------------------------------
-          const productosStats = {}; // m -> array de {product, n, mean, diff, z}
-          for (const product of Object.keys(prodAgg)) {
-            const metrics = prodAgg[product];
-            for (const m of Object.keys(metrics)) {
-              const a = metrics[m];
-              const g = globalStats[m];
-              if (!g || g.count === 0) continue;
-
-              const meanProd = a.count > 0 ? (a.sum / a.count) : 0;
-              const diff = meanProd - g.mean;
-
-              let z = null;
-              if (a.count > 1 && g.sd > 0) {
-                const se = g.sd / Math.sqrt(a.count);
-                if (se > 0) {
-                  z = diff / se;
-                }
-              }
-
-              if (!productosStats[m]) productosStats[m] = [];
-              productosStats[m].push({
-                product,
-                n: a.count,
-                mean: meanProd,
-                diff,
-                z
-              });
-            }
-          }
-
-          // Ordenamos por métrica y por media desc
-          for (const m of Object.keys(productosStats)) {
-            productosStats[m].sort((a, b) => b.mean - a.mean);
-          }
-
-          // -----------------------------------------
-          // 3) Conteo global de apariciones como máximo (como antes)
-          // -----------------------------------------
-          for (const monitor of Object.keys(dataMax)) {
-            const metricsObj = dataMax[monitor];
-            for (const metric of Object.keys(metricsObj)) {
-              const info = metricsObj[metric];
-              for (const row of info.rows) {
-                const prod = row.PRODUCT || "(VACÍO)";
-                globalCountsMax[prod] = (globalCountsMax[prod] || 0) + 1;
-              }
-            }
-          }
-          const globalSortedMax = Object.entries(globalCountsMax).sort((a, b) => b[1] - a[1]);
-
-          // -----------------------------------------
-          // 4) Interrelación y confusión por MONITOR
-          // -----------------------------------------
-          const monitorResumen = {}; // m -> {altos:[], bajos:[]}
-          for (const monitor of Object.keys(monitorAgg)) {
-            const metrics = monitorAgg[monitor];
-            for (const m of Object.keys(metrics)) {
-              const a = metrics[m];
-              const g = globalStats[m];
-              if (!g || g.count === 0) continue;
-
-              const meanMon = a.count > 0 ? (a.sum / a.count) : 0;
-              const diff = meanMon - g.mean;
-
-              let z = null;
-              if (a.count > 1 && g.sd > 0) {
-                const se = g.sd / Math.sqrt(a.count);
-                if (se > 0) z = diff / se;
-              }
-
-              if (!monitorResumen[m]) monitorResumen[m] = [];
-              monitorResumen[m].push({
-                monitor,
-                n: a.count,
-                mean: meanMon,
-                diff,
-                z
-              });
-            }
-          }
-
-          const monitorCtx = {};
-          for (const m of Object.keys(monitorResumen)) {
-            const lista = monitorResumen[m].filter(x => x.n >= 10);
-            const altos = lista.filter(x => x.diff > 0)
-              .sort((a, b) => b.diff - a.diff)
-              .slice(0, 3);
-            const bajos = lista.filter(x => x.diff < 0)
-              .sort((a, b) => a.diff - b.diff)
-              .slice(0, 3);
-            monitorCtx[m] = { altos, bajos };
-          }
-
-          // -----------------------------------------
-          // 5) Construcción del TEXTO sección 5
-          // -----------------------------------------
-          let numTxt = "";
-
-          numTxt += "PANORAMA GLOBAL DE LAS MÉTRICAS DE BLANCURA\n";
-          numTxt += "-------------------------------------------\n";
-          numTxt += "Total de filas leídas: " + totalFilas + "\n\n";
-
-          numTxt += "Estadísticos globales por métrica de blancura:\n";
-          for (const m of whitenessMetrics) {
-            const g = globalStats[m];
-            if (!g) continue;
-            numTxt +=
-              "  - " + m +
-              " | n=" + g.count +
-              " | media global≈ " + g.mean.toFixed(3) +
-              " | desviación estándar≈ " + g.sd.toFixed(3) + "\n";
-          }
-          numTxt += "\n";
-
-          numTxt += "PERFIL CUANTITATIVO DE BLANCURA POR PRODUCTO\n";
-          numTxt += "---------------------------------------------\n";
-          numTxt += "Se muestran medias por producto y métrica, comparadas con la media global (diferencia y z-score aproximado).\n\n";
-
-          for (const m of whitenessMetrics) {
-            const lista = productosStats[m];
-            const g = globalStats[m];
-            if (!lista || !lista.length || !g) continue;
-
-            numTxt += "Métrica: " + m + " (media global≈ " + g.mean.toFixed(3) + ")\n";
-            numTxt += "PRODUCT | n | media producto | diferencia vs global | z-score aprox.\n";
-            numTxt += "--------|---|----------------|----------------------|-----------------\n";
-
-            lista.forEach(p => {
-              const diffTxt = p.diff.toFixed(3);
-              const zTxt = (p.z === null) ? "NA" : p.z.toFixed(2);
-              numTxt +=
-                p.product + " | " +
-                p.n + " | " +
-                p.mean.toFixed(3) + " | " +
-                (p.diff >= 0 ? "+" + diffTxt : diffTxt) + " | " +
-                zTxt + "\n";
-            });
-            numTxt += "\n";
-          }
-
-          numTxt += "MÁXIMOS DE BLANCURA POR MONITOR Y MÉTRICA\n";
-          numTxt += "-----------------------------------------\n";
-          for (const monitor of Object.keys(dataMax).sort()) {
-            numTxt += "MONITOR = " + monitor + "\n";
-            const metricsObj = dataMax[monitor];
-            for (const metric of Object.keys(metricsObj)) {
-              const info = metricsObj[metric];
-              numTxt += "  Métrica: " + metric + ", valor máximo: " + info.max + "\n";
-              for (const row of info.rows) {
-                numTxt += "    - PRODUCT = " + row.PRODUCT +
-                          ", MODALITY = " + row.MODALITY +
-                          ", SCENARIOS = " + row.SCENARIOS +
-                          ", WASH = " + row.WASH +
-                          ", PROCESS = " + row.PROCESS + "\n";
-              }
-            }
-            numTxt += "\n";
-          }
-
-          numTxt += "Conteo global de apariciones como máximo de blancura por PRODUCT:\n";
-          globalSortedMax.forEach(([prod, cnt]) => {
-            numTxt += "  - " + prod + ": " + cnt + "\n";
-          });
-          numTxt += "\n";
-
-          numTxt += "POSSIBLES EFECTOS DE CONFUSIÓN ASOCIADOS A MONITOR\n";
-          numTxt += "--------------------------------------------------\n";
-          numTxt += "Se indica dónde los MONITOR muestran medias muy por encima o por debajo de la media global.\n\n";
-
-          for (const m of whitenessMetrics) {
-            const ctx = monitorCtx[m];
-            const g = globalStats[m];
-            if (!ctx || !g) continue;
-
-            numTxt += "Métrica: " + m + " (media global≈ " + g.mean.toFixed(3) + ")\n";
-
-            if (ctx.altos.length) {
-              numTxt += "  MONITOR con medias de blancura claramente superiores a la global:\n";
-              ctx.altos.forEach(c => {
-                const diffTxt = c.diff.toFixed(3);
-                const zTxt = (c.z === null) ? "NA" : c.z.toFixed(2);
-                numTxt +=
-                  "    - MONITOR=" + c.monitor +
-                  " | n=" + c.n +
-                  " | media≈ " + c.mean.toFixed(3) +
-                  " | diferencia vs global=" + (c.diff >= 0 ? "+" + diffTxt : diffTxt) +
-                  " | z≈ " + zTxt + "\n";
-              });
-            } else {
-              numTxt += "  No se observaron MONITOR con medias muy por encima de la global (n≥10).\n";
-            }
-
-            if (ctx.bajos.length) {
-              numTxt += "  MONITOR con medias de blancura claramente inferiores a la global:\n";
-              ctx.bajos.forEach(c => {
-                const diffTxt = c.diff.toFixed(3);
-                const zTxt = (c.z === null) ? "NA" : c.z.toFixed(2);
-                numTxt +=
-                  "    - MONITOR=" + c.monitor +
-                  " | n=" + c.n +
-                  " | media≈ " + c.mean.toFixed(3) +
-                  " | diferencia vs global=" + diffTxt +
-                  " | z≈ " + zTxt + "\n";
-              });
-            } else {
-              numTxt += "  No se observaron MONITOR con medias muy por debajo de la global (n≥10).\n";
-            }
-
-            numTxt += "\n";
-          }
-
-          // 👉 Sección 5
-          numericEl.textContent = numTxt;
-
-          // 👉 Sección 7: gráfico de apariciones como máximo por PRODUCT (como antes)
-          prepararDatosGrafico({
-            labels: globalSortedMax.map(([prod]) => prod),
-            values: globalSortedMax.map(([, cnt]) => cnt),
-            datasetLabel: "Apariciones como máximo de blancura",
-            title: "Apariciones como máximo de blancura por PRODUCT",
-            xLabel: "PRODUCT",
-            yLabel: "Número de apariciones como máximo"
-          });
-
-          if (usarBackendLLM) {
-            pedirExplicacionDesdeBackend(userPrompt, numTxt, "whiteness");
-            statusEl.textContent =
-              "✅ Análisis de blancura numérico avanzado generado. Esperando respuesta del LLM en la sección 6…";
-          }
-        },
-        error: function(err) {
-          statusEl.textContent = "❌ Error al leer el CSV: " + err;
-          numericEl.textContent = "// Error al procesar el archivo.";
-          textEl.textContent = "";
-          prepararDatosGrafico(null);
-        }
-      });
+      pedirExplicacionDesdeBackendStructured(payload);
+      statusEl.textContent = "✅ Blancura: sección 5 lista. Sección 6 generándose con /build_section6…";
+    },
+    error: function(err) {
+      statusEl.textContent = "❌ Error al leer el CSV: " + err;
+      numericEl.textContent = "// Error al procesar el archivo.";
+      textEl.textContent = "";
+      prepararDatosGrafico(null);
+      prepararDatosGraficoMultivariable(null);
     }
-       // -------------------------------------------------------------
-    // Modo 3: Resumen general de la tabla
-    // -------------------------------------------------------------
-    function analizarResumen(statusEl, numericEl, textEl, userPrompt, usarBackendLLM) {
-      const stats = {};
-      let totalFilas = 0;
-      let headersLocal = null;
+  });
+}
 
-      Papa.parse(csvFile, {
-        header: true,
-        skipEmptyLines: true,
-        worker: false,
-        chunkSize: 1024 * 1024,
-        chunk: function(results) {
-          const rows = results.data;
-          if (!headersLocal) {
-            headersLocal = results.meta && results.meta.fields ? results.meta.fields : [];
-          }
-          for (const row of rows) {
-            totalFilas++;
-            for (const col of Object.keys(row)) {
-              if (!stats[col]) {
-                stats[col] = {
-                  numericCount: 0,
-                  nonNumericCount: 0,
-                  sum: 0,
-                  min: null,
-                  max: null,
-                  categories: {}
-                };
-              }
-              const valRaw = row[col];
-              if (valRaw === null || valRaw === undefined) continue;
-              const val = String(valRaw).trim();
-              if (val === "") continue;
+// -------------------------------------------------------------
+// Modo 3: Resumen (payload estructurado básico)
+// -------------------------------------------------------------
+function analizarResumen(statusEl, numericEl, textEl, userPrompt) {
+  const stats = {};
+  let totalFilas = 0;
+  let headersLocal = null;
 
-              const num = parseFloat(val.replace(",", "."));
-              if (!Number.isNaN(num) && val.match(/^[+-]?(\d+(\.\d+)?|\.\d+)$/)) {
-                stats[col].numericCount++;
-                stats[col].sum += num;
-                if (stats[col].min === null || num < stats[col].min) stats[col].min = num;
-                if (stats[col].max === null || num > stats[col].max) stats[col].max = num;
-              } else {
-                stats[col].nonNumericCount++;
-                stats[col].categories[val] = (stats[col].categories[val] || 0) + 1;
-              }
-            }
-          }
-        },
-        complete: function() {
-          if (!headersLocal || !headersLocal.length) {
-            statusEl.textContent = "❌ No se pudo detectar estructura válida en el CSV.";
-            numericEl.textContent = "// Sin información estructural disponible.";
-            textEl.textContent = "// No hay suficiente información para generar un resumen con el LLM.";
-            prepararDatosGrafico(null);
-            return;
-          }
-
-          const numCols = headersLocal.length;
-          let numTxt = "";
-          numTxt += "Total de filas leídas: " + totalFilas + "\n";
-          numTxt += "Total de columnas detectadas: " + numCols + "\n\n";
-
-          numTxt += "Resumen por columna:\n";
-          headersLocal.forEach(col => {
-            const s = stats[col] || {
-              numericCount: 0, nonNumericCount: 0,
-              sum: 0, min: null, max: null, categories: {}
-            };
-            const esNumerica = s.numericCount > 0 && s.nonNumericCount === 0;
-            numTxt += "Columna: " + col + "\n";
-            if (esNumerica) {
-              const mean = s.numericCount > 0 ? (s.sum / s.numericCount) : null;
-              numTxt += "  Tipo: numérica\n";
-              numTxt += "  Valores válidos: " + s.numericCount + "\n";
-              if (s.min !== null && s.max !== null) {
-                numTxt += "  Rango aproximado: [" + s.min + ", " + s.max + "]\n";
-              }
-              if (mean !== null) {
-                numTxt += "  Promedio aproximado: " + mean + "\n";
-              }
-            } else {
-              const cats = Object.entries(s.categories);
-              numTxt += "  Tipo: categórica / mixta\n";
-              numTxt += "  Valores no vacíos: " + (s.numericCount + s.nonNumericCount) + "\n";
-              numTxt += "  Nº de categorías distintas: " + cats.length + "\n";
-              if (cats.length) {
-                const topCats = cats.sort((a,b) => b[1]-a[1]).slice(0,5);
-                numTxt += "  Categorías más frecuentes:\n";
-                topCats.forEach(([v,c]) => {
-                  numTxt += "    - " + v + " (" + c + " ocurrencias)\n";
-                });
-              }
-            }
-            numTxt += "\n";
-          });
-
-          // 👉 Sección 5 SIEMPRE el mismo resumen interno
-          numericEl.textContent = numTxt;
-
-          // 👉 Sección 7: gráfico simple de densidad de datos por columna
-          const labels = headersLocal;
-          const values = headersLocal.map(col => {
-            const s = stats[col] || { numericCount: 0, nonNumericCount: 0 };
-            return (s.numericCount || 0) + (s.nonNumericCount || 0);
-          });
-          prepararDatosGrafico({
-            labels,
-            values,
-            datasetLabel: "Valores no vacíos",
-            title: "Valores no vacíos por columna",
-            xLabel: "Columnas",
-            yLabel: "Número de valores no vacíos"
-          });
-
-          if (usarBackendLLM) {
-            pedirExplicacionDesdeBackend(userPrompt, numTxt, "resumen");
-            statusEl.textContent = "✅ Resumen numérico generado. Esperando respuesta del LLM en la sección 6…";
-          }
-        },
-        error: function(err) {
-          statusEl.textContent = "❌ Error al leer el CSV: " + err;
-          numericEl.textContent = "// Error al procesar el archivo.";
-          textEl.textContent = "";
-          prepararDatosGrafico(null);
+  Papa.parse(csvFile, {
+    header: true,
+    skipEmptyLines: true,
+    worker: false,
+    chunkSize: 1024 * 1024,
+    chunk: function(results) {
+      const rows = results.data;
+      if (!headersLocal) headersLocal = results.meta && results.meta.fields ? results.meta.fields : [];
+      for (const row of rows) {
+        totalFilas++;
+        for (const col of Object.keys(row)) {
+          if (!stats[col]) stats[col] = { nonEmpty: 0 };
+          const v = row[col];
+          if (v !== null && v !== undefined && String(v).trim() !== "") stats[col].nonEmpty++;
         }
+      }
+    },
+    complete: function() {
+      if (!headersLocal || !headersLocal.length) {
+        statusEl.textContent = "❌ No se pudo detectar estructura válida.";
+        numericEl.textContent = "// Sin estructura.";
+        textEl.textContent = "// Sin datos suficientes.";
+        prepararDatosGrafico(null);
+        prepararDatosGraficoMultivariable(null);
+        return;
+      }
+
+      const numCols = headersLocal.length;
+      const topDensidad = headersLocal.map(c => ({ col: c, nonEmpty: stats[c]?.nonEmpty || 0 }))
+        .sort((a,b)=>b.nonEmpty-a.nonEmpty);
+
+      let numTxt = "";
+      numTxt += "TABLE SUMMARY\n";
+      numTxt += "------------\n";
+      numTxt += "Rows: " + totalFilas + "\n";
+      numTxt += "Cols: " + numCols + "\n\n";
+      numTxt += "Top non-empty columns:\n";
+     topDensidad.slice(0, 20).forEach(x => {
+    numTxt += "  - " + x.col + ": " + x.nonEmpty + "\n";
+});
+
+      numericEl.textContent = numTxt;
+
+      prepararDatosGrafico({
+        labels: topDensidad.slice(0,30).map(x=>x.col),
+        values: topDensidad.slice(0,30).map(x=>x.nonEmpty),
+        datasetLabel: "Non-empty",
+        title: "Valores no vacíos por columna (top)",
+        xLabel: "Columns",
+        yLabel: "Non-empty count"
       });
+
+      prepararDatosGraficoMultivariable(null);
+
+      const payload = {
+        mode: "resumen",
+        prompt_key: currentPromptKey,
+        prompt_text: userPrompt,
+        totalFilas: totalFilas,
+        numCols: numCols,
+        with_titles: true,
+        detail_level: 3,
+        min_words: 1200,
+        topDensidad: topDensidad
+      };
+
+      pedirExplicacionDesdeBackendStructured(payload);
+      statusEl.textContent = "✅ Resumen: sección 5 lista. Sección 6 generándose con /build_section6…";
+    },
+    error: function(err) {
+      statusEl.textContent = "❌ Error al leer el CSV: " + err;
+      numericEl.textContent = "// Error.";
+      textEl.textContent = "";
+      prepararDatosGrafico(null);
+      prepararDatosGraficoMultivariable(null);
     }
+  });
+}
 
+// -------------------------------------------------------------
+// Modo 4: RESPONSE vs Otras (Prompt 4)
+// ✅ ARREGLO: aquí también generamos gráfico multivariable
+// ✅ Sección 5 más rica: tasas favorables por columnas clave + contextos críticos
+// ✅ Payload compatible con app.py: responseDistribucion [{resp,cnt,pct}] (no pares)
+// -------------------------------------------------------------
+function analizarResponseVsOtros(statusEl, numericEl, textEl, userPrompt) {
+  const objetivos = new Set(["01.SUPERIOR", "02.SUPERIOR_TREND"]);
 
-        // -------------------------------------------------------------
-    // Modo 4: Comparar RESPONSE con las demás columnas (versión avanzada)
-    //   - Mantiene la distribución global de RESPONSE
-    //   - Mantiene las asociaciones básicas columna–valor–RESPONSE
-    //   - Añade medidas cuantitativas de desempeño (tasas favorables)
-    //     usando RESPONSE={01.SUPERIOR,02.SUPERIOR_TREND} como “favorables”
-    //   - Estima significancia (z-score) de esas tasas por contexto
-    //   - Detecta contextos (valores de columnas) que suben/bajan mucho
-    //     la probabilidad de respuesta favorable (efectos de confusión)
-    // -------------------------------------------------------------
-    function analizarResponseVsOtros(statusEl, numericEl, textEl, userPrompt, usarBackendLLM) {
-      const objetivos = new Set(["01.SUPERIOR", "02.SUPERIOR_TREND"]);
+  const responseCounts = {};
+  const contextoFavStats = {}; // col -> valor -> {total,fav}
+  const colNonEmpty = {};      // col -> nonEmpty count
+  const colUnique = {};        // col -> Set() de valores (muestreo controlado)
+  let totalFilas = 0;
+  let headersLocal = null;
+  let totalFavorables = 0;
 
-      const responseCounts = {};
-      const responseColumnCounts = {};
-      const contextoFavStats = {}; // col -> valor -> {total, fav}
+  // Ajustes de heurística (puedes afinarlos)
+  const MAX_UNIQUE_TRACK = 4000;   // límite para no explotar memoria
+  const MAX_CONTEXT_COLS = 6;      // cuántas columnas usar como "contextos críticos"
+  const MIN_NONEMPTY_RATIO = 0.20; // mínimo % no vacío para considerar columna
+  const MAX_CARD_RATIO = 0.60;     // máximo % cardinalidad/filas (evita ID únicos)
+  const MIN_CARD = 2;             // mínimo cardinalidad
+  const MAX_CARD = 80;            // máximo cardinalidad (si supera, probablemente es ID/texto libre)
+  const EXCLUDE_COLS = new Set(["RESPONSE"]); // excluimos RESPONSE como contexto (ya es target)
 
-      let totalFilas = 0;
-      let headersLocal = null;
-      let totalFavorables = 0;
+  // Heurística: ¿parece numérica?
+  function isProbablyNumeric(sampleValues) {
+    // Si la mayoría de muestras parsean a número -> numérica
+    let n = 0, ok = 0;
+    for (const v of sampleValues) {
+      if (v === null || v === undefined) continue;
+      const s = String(v).trim();
+      if (!s) continue;
+      n++;
+      const x = Number(s);
+      if (!Number.isNaN(x)) ok++;
+      if (n >= 30) break; // no hace falta más
+    }
+    if (n === 0) return false;
+    return (ok / n) >= 0.85;
+  }
 
+  Papa.parse(csvFile, {
+    header: true,
+    skipEmptyLines: true,
+    worker: false,
+    chunkSize: 1024 * 1024,
+    chunk: function(results) {
+      const rows = results.data;
+      if (!headersLocal) {
+        headersLocal = results.meta && results.meta.fields ? results.meta.fields : [];
+        // inicializar estructuras
+        headersLocal.forEach(h => {
+          colNonEmpty[h] = 0;
+          colUnique[h] = new Set();
+        });
+      }
+
+      for (const row of rows) {
+        totalFilas++;
+
+        const resp = ((row["RESPONSE"] || "").trim()) || "(EMPTY)";
+        responseCounts[resp] = (responseCounts[resp] || 0) + 1;
+
+        const esFavorable = objetivos.has(resp);
+        if (esFavorable) totalFavorables++;
+
+        // recolectar no-vacíos y uniques por columna (para detectar contextos)
+        for (const col of headersLocal) {
+          const raw = row[col];
+          const val = (raw === null || raw === undefined) ? "" : String(raw).trim();
+          if (val !== "") {
+            colNonEmpty[col]++;
+
+            // track uniques con límite
+            const s = colUnique[col];
+            if (s && s.size < MAX_UNIQUE_TRACK) s.add(val);
+          }
+        }
+      }
+    },
+    complete: function() {
+      if (!headersLocal || !headersLocal.length) {
+        statusEl.textContent = "❌ No se pudo detectar estructura válida.";
+        numericEl.textContent = "// Sin estructura.";
+        textEl.textContent = "// Sin datos suficientes.";
+        prepararDatosGrafico(null);
+        prepararDatosGraficoMultivariable(null);
+        return;
+      }
+
+      const formatPct = (v) => (v * 100).toFixed(2) + "%";
+      const tasaGlobalFav = totalFilas > 0 ? (totalFavorables / totalFilas) : 0;
+
+      // -----------------------------
+      // 1) Detectar columnas candidatas automáticamente
+      // -----------------------------
+      const candidates = [];
+      for (const col of headersLocal) {
+        if (EXCLUDE_COLS.has(col)) continue;
+
+        const nonEmpty = colNonEmpty[col] || 0;
+        const nonEmptyRatio = totalFilas > 0 ? (nonEmpty / totalFilas) : 0;
+        if (nonEmptyRatio < MIN_NONEMPTY_RATIO) continue;
+
+        const uniqCount = (colUnique[col] ? colUnique[col].size : 0);
+        if (uniqCount < MIN_CARD) continue;
+        if (uniqCount > MAX_CARD) continue;
+
+        const cardRatio = totalFilas > 0 ? (uniqCount / totalFilas) : 0;
+        if (cardRatio > MAX_CARD_RATIO) continue;
+
+        // descartar columnas numéricas (con una mini muestra)
+        const sample = [];
+        // sacar muestra rápida desde Set (hasta 30)
+        let i = 0;
+        for (const v of colUnique[col]) { sample.push(v); i++; if (i >= 30) break; }
+        if (isProbablyNumeric(sample)) continue;
+
+        // score: más no-vacíos + cardinalidad moderada (premia señal, castiga ruido)
+        const score = nonEmptyRatio * 0.7 + (1 - Math.abs(uniqCount - 12) / 12) * 0.3;
+        candidates.push({ col, nonEmpty, nonEmptyRatio, uniqCount, score });
+      }
+
+      candidates.sort((a,b) => b.score - a.score);
+      const selectedCols = candidates.slice(0, MAX_CONTEXT_COLS).map(x => x.col);
+
+      // Si no encontró nada, fallback a tus columnas clave clásicas si existen
+      const FALLBACK = ["PRODUCT_TEST","PRODUCT","MONITOR","MODALITY","SCENARIOS","WASH","PROCESS"];
+      if (!selectedCols.length) {
+        FALLBACK.forEach(c => {
+          if (headersLocal.includes(c) && !selectedCols.includes(c) && selectedCols.length < MAX_CONTEXT_COLS) {
+            selectedCols.push(c);
+          }
+        });
+      }
+
+      // -----------------------------
+      // 2) Ahora sí, reconstruimos contextoFavStats SOLO para selectedCols
+      //    (segunda pasada al CSV)
+      // -----------------------------
       Papa.parse(csvFile, {
         header: true,
         skipEmptyLines: true,
         worker: false,
         chunkSize: 1024 * 1024,
-        chunk: function(results) {
-          const rows = results.data;
-          if (!headersLocal) {
-            headersLocal = results.meta && results.meta.fields ? results.meta.fields : [];
-          }
-          for (const row of rows) {
-            totalFilas++;
-
-            const rRaw = row["RESPONSE"];
-            const resp = (rRaw === undefined || rRaw === null || String(rRaw).trim() === "")
-              ? "(VACÍO)" : String(rRaw).trim();
-
-            responseCounts[resp] = (responseCounts[resp] || 0) + 1;
-
+        chunk: function(res2) {
+          for (const row of res2.data) {
+            const resp = ((row["RESPONSE"] || "").trim()) || "(EMPTY)";
             const esFavorable = objetivos.has(resp);
-            if (esFavorable) totalFavorables++;
 
-            for (const col of headersLocal) {
-              if (col === "RESPONSE") continue;
-              const vRaw = row[col];
-              const val = (vRaw === undefined || vRaw === null || String(vRaw).trim() === "")
-                ? "(VACÍO)" : String(vRaw).trim();
-
-              // Mapa de valores por RESPONSE (como antes)
-              if (!responseColumnCounts[col]) responseColumnCounts[col] = {};
-              if (!responseColumnCounts[col][resp]) responseColumnCounts[col][resp] = {};
-              responseColumnCounts[col][resp][val] =
-                (responseColumnCounts[col][resp][val] || 0) + 1;
-
-              // Estadísticos de desempeño favorable por contexto
+            for (const col of selectedCols) {
+              const val = ((row[col] || "").trim()) || "(EMPTY)";
               if (!contextoFavStats[col]) contextoFavStats[col] = {};
               if (!contextoFavStats[col][val]) contextoFavStats[col][val] = { total: 0, fav: 0 };
               contextoFavStats[col][val].total++;
@@ -1974,185 +1537,160 @@ function analizarComparaciones(statusEl, numericEl, textEl, userPrompt, usarBack
           }
         },
         complete: function() {
-          if (!headersLocal || !headersLocal.length) {
-            statusEl.textContent = "❌ No se pudo detectar estructura válida en el CSV.";
-            numericEl.textContent = "// Sin información estructural disponible.";
-            textEl.textContent = "// No hay suficiente información para analizar RESPONSE con el LLM.";
-            prepararDatosGrafico(null);
-            return;
+          // -----------------------------
+          // 3) Construir responseDistribucion y topContextos
+          // -----------------------------
+          const sortedResponses = Object.entries(responseCounts).sort((a,b)=>b[1]-a[1]);
+
+          const responseDistribucion = sortedResponses.map(([r,c]) => ({
+            resp: r,
+            cnt: c,
+            pct: totalFilas>0 ? (c*100/totalFilas) : 0
+          }));
+
+          const topContextos = [];
+          for (const col of Object.keys(contextoFavStats)) {
+            const mapa = contextoFavStats[col];
+            const arr = Object.entries(mapa).map(([valor, st]) => {
+              const n = st.total;
+              const fav = st.fav;
+              const tasa = n>0 ? fav/n : 0;
+              const diff = tasa - tasaGlobalFav;
+              let z = null;
+              if (n>1 && tasaGlobalFav>0 && tasaGlobalFav<1) {
+                const se = Math.sqrt(tasaGlobalFav*(1-tasaGlobalFav)/n);
+                if (se>0) z = diff/se;
+              }
+              return { valor, total:n, fav, tasa, diff, z };
+            }).filter(x => x.total >= 20);
+
+            const altos = arr.filter(x=>x.diff>0).sort((a,b)=>b.diff-a.diff).slice(0,3);
+            const bajos = arr.filter(x=>x.diff<0).sort((a,b)=>a.diff-b.diff).slice(0,3);
+            topContextos.push({ ctxName: col, altos, bajos });
           }
 
-          const sortedResponses = Object.entries(responseCounts).sort((a, b) => b[1] - a[1]);
-
+          // -----------------------------
+          // 4) Sección 5: texto (ahora incluye columnas detectadas)
+          // -----------------------------
           let numTxt = "";
+          numTxt += "RESPONSE DISTRIBUTION\n";
+          numTxt += "---------------------\n";
+          numTxt += "Total rows: " + totalFilas + "\n";
+          numTxt += "Global favorable rate (01.SUPERIOR + 02.SUPERIOR_TREND): " + formatPct(tasaGlobalFav) + "\n\n";
 
-          // -----------------------------------------
-          // 1) Distribución global de RESPONSE
-          // -----------------------------------------
-          numTxt += "DISTRIBUCIÓN GLOBAL DE RESPONSE\n";
-          numTxt += "--------------------------------\n";
-          numTxt += "Total de filas leídas: " + totalFilas + "\n\n";
-
-          sortedResponses.forEach(([r, c]) => {
-            const pct = totalFilas > 0 ? (c * 100 / totalFilas).toFixed(2) + "%" : "–";
-            numTxt += "  - " + r + ": " + c + " filas (" + pct + ")\n";
-          });
-          numTxt += "\n";
-
-          // -----------------------------------------
-          // 2) Asociaciones básicas (como antes)
-          // -----------------------------------------
-          numTxt += "ASOCIACIONES BÁSICAS ENTRE RESPONSE Y OTRAS COLUMNAS\n";
-          numTxt += "----------------------------------------------------\n";
-          numTxt += "Se muestran, para las primeras 6 columnas distintas de RESPONSE, los valores más frecuentes\n";
-          numTxt += "dentro de cada categoría de RESPONSE.\n\n";
-
-          const colsAnalizar = headersLocal.filter(c => c !== "RESPONSE").slice(0, 6);
-          const resumenColumnas = [];
-
-          colsAnalizar.forEach(col => {
-            const byResp = responseColumnCounts[col] || {};
-            numTxt += "Columna: " + col + "\n";
-            const perResponseTop = {};
-            sortedResponses.forEach(([resp, _cntR]) => {
-              const mapaValores = byResp[resp];
-              if (!mapaValores) return;
-              const sortedVals = Object.entries(mapaValores).sort((a, b) => b[1] - a[1]).slice(0, 3);
-              if (!sortedVals.length) return;
-              perResponseTop[resp] = sortedVals;
-
-              numTxt += "  RESPONSE = " + resp + ":\n";
-              sortedVals.forEach(([v, c]) => {
-                numTxt += "    - " + v + " (" + c + " filas)\n";
-              });
-            });
-            numTxt += "\n";
-            resumenColumnas.push({ columna: col, perResponseTop });
+          sortedResponses.forEach(([r,c])=>{
+            const pct = totalFilas>0 ? (c*100/totalFilas).toFixed(2)+"%" : "0.00%";
+            numTxt += `  - ${r}: ${c} (${pct})\n`;
           });
 
-          // -----------------------------------------
-          // 3) Medidas cuantitativas de desempeño
-          //    y posibles efectos de confusión
-          // -----------------------------------------
-          const objetivosExistentes = totalFavorables > 0;
-          if (objetivosExistentes) {
-            const pGlobal = totalFavorables / totalFilas;
-            const formatPct = (v) => (v * 100).toFixed(2) + "%";
-
-            numTxt += "MEDIDAS CUANTITATIVAS DE DESEMPEÑO (RESPUESTA FAVORABLE)\n";
-            numTxt += "--------------------------------------------------------\n";
-            numTxt += "Se considera como 'respuesta favorable' RESPONSE en {01.SUPERIOR, 02.SUPERIOR_TREND}.\n";
-            numTxt += "Tasa global de respuesta favorable: " + formatPct(pGlobal) + "\n\n";
-
-            numTxt += "INTERRELACIÓN ENTRE VARIABLES Y POSIBLES EFECTOS DE CONFUSIÓN\n";
-            numTxt += "------------------------------------------------------------\n";
-            numTxt += "Para cada una de las primeras 6 columnas se identifican valores de contexto\n";
-            numTxt += "que aumentan o reducen significativamente la probabilidad de respuesta favorable.\n\n";
-
-            colsAnalizar.forEach(col => {
-              const mapa = contextoFavStats[col] || {};
-              const arr = Object.entries(mapa).map(([val, st]) => {
-                const n = st.total;
-                const fav = st.fav;
-                const tasa = n > 0 ? (fav / n) : 0;
-                const diff = tasa - pGlobal;
-                let z = null;
-                if (n > 1 && pGlobal > 0 && pGlobal < 1) {
-                  const se = Math.sqrt(pGlobal * (1 - pGlobal) / n);
-                  if (se > 0) z = diff / se;
-                }
-                return { val, n, fav, tasa, diff, z };
-              });
-
-              const arrFiltrado = arr.filter(x => x.n >= 20); // evitar ruido con pocos casos
-              if (!arrFiltrado.length) return;
-
-              const altos = arrFiltrado
-                .filter(x => x.diff > 0)
-                .sort((a, b) => b.diff - a.diff)
-                .slice(0, 3);
-              const bajos = arrFiltrado
-                .filter(x => x.diff < 0)
-                .sort((a, b) => a.diff - b.diff)
-                .slice(0, 3);
-
-              const formatDiff = (d) => {
-                const v = (d * 100).toFixed(2);
-                return (v >= 0 ? "+" + v : v) + " p.p.";
-              };
-
-              numTxt += "Columna analizada como contexto: " + col + "\n";
-
-              if (altos.length) {
-                numTxt += "  Valores asociados a una tasa de respuesta favorable mayor que la global:\n";
-                altos.forEach(c => {
-                  const zTxt = (c.z === null) ? "NA" : c.z.toFixed(2);
-                  numTxt +=
-                    "    - " + c.val +
-                    " | n=" + c.n +
-                    ", favorables=" + c.fav +
-                    ", tasa=" + formatPct(c.tasa) +
-                    ", diferencia vs global=" + formatDiff(c.diff) +
-                    ", z≈ " + zTxt + "\n";
-                });
-              } else {
-                numTxt += "  No se observaron valores con tasas claramente superiores a la global (n≥20).\n";
-              }
-
-              if (bajos.length) {
-                numTxt += "  Valores asociados a una tasa de respuesta favorable menor que la global:\n";
-                bajos.forEach(c => {
-                  const zTxt = (c.z === null) ? "NA" : c.z.toFixed(2);
-                  numTxt +=
-                    "    - " + c.val +
-                    " | n=" + c.n +
-                    ", favorables=" + c.fav +
-                    ", tasa=" + formatPct(c.tasa) +
-                    ", diferencia vs global=" + formatDiff(c.diff) +
-                    ", z≈ " + zTxt + "\n";
-                });
-              } else {
-                numTxt += "  No se observaron valores con tasas claramente inferiores a la global (n≥20).\n";
-              }
-
-              numTxt += "\n";
-            });
-
-            numTxt += "Nota: los z-scores son aproximados y sirven como indicador de si la diferencia\n";
-            numTxt += "entre la tasa local y la tasa global podría ser estadísticamente relevante.\n\n";
+          numTxt += "\nAUTO-DETECTED CONTEXT COLUMNS\n";
+          numTxt += "-----------------------------\n";
+          if (selectedCols.length) {
+            numTxt += "Selected columns: " + selectedCols.join(", ") + "\n";
           } else {
-            numTxt += "No se detectaron RESPONSE en {01.SUPERIOR, 02.SUPERIOR_TREND};\n";
-            numTxt += "no se construyen tasas de 'respuesta favorable' ni z-scores.\n\n";
+            numTxt += "No context columns detected (fallback failed).\n";
           }
 
-          // 👉 Sección 5
+          numTxt += "\nKEY COLUMNS: FAVORABLE RATES BY VALUE (CRITICAL CONTEXTS)\n";
+          numTxt += "--------------------------------------------------------\n";
+          numTxt += "Contextos construidos solo con columnas seleccionadas automáticamente (o fallback). n mínimo por valor: 20.\n\n";
+
+          topContextos.forEach(ctx=>{
+            numTxt += "CTX COLUMN: " + ctx.ctxName + "\n";
+            if (ctx.altos.length) {
+              numTxt += "  HIGH (increases favorable probability):\n";
+              ctx.altos.forEach(c=>{
+                const zt = (c.z===null||c.z===undefined)?"NA":Number(c.z).toFixed(2);
+                numTxt += `    - ${c.valor} | n=${c.total} | fav=${c.fav} | rate=${formatPct(c.tasa)} | Δ=${(c.diff*100>=0?"+":"")}${(c.diff*100).toFixed(2)} p.p. | z≈${zt}\n`;
+              });
+            } else {
+              numTxt += "  HIGH: (none with n>=20)\n";
+            }
+            if (ctx.bajos.length) {
+              numTxt += "  LOW (decreases favorable probability):\n";
+              ctx.bajos.forEach(c=>{
+                const zt = (c.z===null||c.z===undefined)?"NA":Number(c.z).toFixed(2);
+                numTxt += `    - ${c.valor} | n=${c.total} | fav=${c.fav} | rate=${formatPct(c.tasa)} | Δ=${(c.diff*100>=0?"+":"")}${(c.diff*100).toFixed(2)} p.p. | z≈${zt}\n`;
+              });
+            } else {
+              numTxt += "  LOW: (none with n>=20)\n";
+            }
+            numTxt += "\n";
+          });
+
           numericEl.textContent = numTxt;
 
-          // 👉 Sección 7: gráfico de distribución de RESPONSE (como antes)
+          // -----------------------------
+          // 5) Gráficos
+          // -----------------------------
           prepararDatosGrafico({
-            labels: sortedResponses.map(([r]) => r),
-            values: sortedResponses.map(([, c]) => c),
-            datasetLabel: "Número de filas",
+            labels: sortedResponses.map(([r])=>r),
+            values: sortedResponses.map(([,c])=>c),
+            datasetLabel: "Rows",
             title: "Distribución de RESPONSE",
-            xLabel: "Valores de RESPONSE",
-            yLabel: "Número de filas"
+            xLabel: "RESPONSE",
+            yLabel: "Row count"
           });
 
-          if (usarBackendLLM) {
-            pedirExplicacionDesdeBackend(userPrompt, numTxt, "response_rel");
-            statusEl.textContent =
-              "✅ Análisis RESPONSE vs otras columnas (numérico avanzado) generado. Esperando respuesta del LLM en la sección 6…";
+          const firstCtx = topContextos.find(x => (x.altos && x.altos.length) || (x.bajos && x.bajos.length));
+          if (firstCtx) {
+            const combined = []
+              .concat(firstCtx.altos || [])
+              .concat(firstCtx.bajos || [])
+              .slice(0,6);
+
+            prepararDatosGraficoMultivariable({
+              labels: combined.map(x => x.valor),
+              datasets: [
+                { label: "Favorable rate (%)", values: combined.map(x => x.tasa * 100) },
+                { label: "n (total rows)", values: combined.map(x => x.total) }
+              ],
+              title: `Favorable rate (%) and n by ${firstCtx.ctxName} (top contexts)`,
+              xLabel: firstCtx.ctxName,
+              yLabel: "Rate% / n"
+            });
+          } else {
+            prepararDatosGraficoMultivariable(null);
           }
+
+          // -----------------------------
+          // 6) Payload a backend (Prompt 4)
+          //    - topContextos ya lleva los nombres reales de columnas detectadas
+          // -----------------------------
+          const payload = {
+            mode: "response_rel",
+            prompt_key: currentPromptKey,
+            prompt_text: userPrompt,
+            totalFilas: totalFilas,
+            tasaGlobalFav: tasaGlobalFav,
+            responseDistribucion: responseDistribucion,
+            with_titles: true,
+            detail_level: 3,
+            min_words: 1200,
+            topContextos: topContextos
+          };
+
+          pedirExplicacionDesdeBackendStructured(payload);
+          statusEl.textContent = "✅ RESPONSE vs Others: sección 5 lista (columnas detectadas). Sección 6 generándose con /build_section6…";
         },
         error: function(err) {
-          statusEl.textContent = "❌ Error al leer el CSV: " + err;
-          numericEl.textContent = "// Error al procesar el archivo.";
+          statusEl.textContent = "❌ Error al re-leer el CSV: " + err;
+          numericEl.textContent = "// Error.";
           textEl.textContent = "";
           prepararDatosGrafico(null);
+          prepararDatosGraficoMultivariable(null);
         }
       });
+    },
+    error: function(err) {
+      statusEl.textContent = "❌ Error al leer el CSV: " + err;
+      numericEl.textContent = "// Error.";
+      textEl.textContent = "";
+      prepararDatosGrafico(null);
+      prepararDatosGraficoMultivariable(null);
     }
-
+  });
+}
   </script>
 </body>
 </html>
