@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    
+    <link rel="icon" href="data:,">
   <meta charset="utf-8" />
   <title>CHATBOT para uso de los CSV de Consumertec</title>
   <meta name="viewport" content="width=device-width,initial-scale=1" />
@@ -82,7 +82,6 @@
       color:var(--muted);
       font-size:0.85rem;
     }
-    /* NUEVO: campos de texto y selects */
     input[type="text"],
     select{
       width:100%;
@@ -194,12 +193,10 @@
       width:16px;
       height:16px;
     }
-    /* Sección 6: más alta y scrollbar garantizado para textos largos */
     #textOutput{
       max-height:60vh;
       overflow-y:auto;
     }
-    /* NUEVO: contenedor gráfico sección 7 */
     .chart-wrapper{
       margin-top:8px;
       border-radius:10px;
@@ -228,12 +225,11 @@
       a partir de <strong>métricas estructuradas</strong> calculadas en la sección 5 (no texto libre).
     </p>
 
-    <!-- Estado del motor -->
     <div id="llmStatus" class="status small">
       ✅ Sección 5 calcula métricas (tasas, contextos críticos, distribuciones).
       ✅ Sección 6 se genera en el backend por /build_section6 usando JSON estructurado (sin imprimir prompts/mandatos).
     </div>
-    <!-- Subir CSV (SECCIÓN 1) -->
+
     <div>
       <div class="section-title">1. Subir archivo CSV</div>
       <label for="csvInput" id="csvLabel">
@@ -243,7 +239,6 @@
       <div id="fileStatus" class="status">⚠️ Ningún archivo seleccionado.</div>
     </div>
 
-    <!-- Elegir tipo de análisis + prompt interno (SECCIÓN 2) -->
     <div>
       <div class="section-title">2. Elegir tipo de análisis y prompt interno</div>
       <p class="small">
@@ -252,8 +247,7 @@
         pero la sección 6 NO imprime mandatos: el backend genera un texto técnico a partir de métricas estructuradas.
       </p>
 
-      <div class="mode-options">
-        <!-- Grupo Comparaciones -->
+<div class="mode-options">
         <div id="group_comparaciones" class="mode-group hidden">
           <label>
             <input id="mode_comparaciones_basico" type="radio" name="mode"
@@ -267,7 +261,6 @@
           </label>
         </div>
 
-        <!-- Grupo Blancura -->
         <div id="group_whiteness" class="mode-group hidden">
           <label>
             <input id="mode_whiteness_basico" type="radio" name="mode"
@@ -281,7 +274,6 @@
           </label>
         </div>
 
-        <!-- Grupo Resumen -->
         <div id="group_resumen" class="mode-group hidden">
           <label>
             <input id="mode_resumen_basico" type="radio" name="mode"
@@ -295,7 +287,6 @@
           </label>
         </div>
 
-        <!-- Grupo RESPONSE vs otras columnas -->
         <div id="group_response_rel" class="mode-group hidden">
           <label>
             <input id="mode_response_basico" type="radio" name="mode"
@@ -314,7 +305,7 @@
         Primero sube un CSV en la sección 1. Luego se activarán aquí los tipos de análisis compatibles.
       </div>
     </div>
-    <!-- Pregunta / Prompt (SECCIÓN 3) -->
+
     <div>
       <div class="section-title">3. Prompt de análisis</div>
       <label for="question">
@@ -332,7 +323,6 @@
       </div>
     </div>
 
-    <!-- Resultados de cómputo -->
     <div>
       <div class="section-title">5. Resultados numéricos (resumen técnico)</div>
       <div id="numericOutput" class="output-box small">
@@ -340,7 +330,6 @@
       </div>
     </div>
 
-    <!-- Explicación en texto continuo -->
     <div>
       <div class="section-title">6. Explicación en texto continuo (respuesta extendida)</div>
       <div id="textOutput" class="output-box">
@@ -363,7 +352,7 @@
         </div>
       </div>
     </div>
-    <!-- NUEVA SECCIÓN 7: gráficos a partir del resumen numérico -->
+
     <div>
       <div class="section-title">7. Visualización gráfica de los resultados</div>
       <p class="small">
@@ -386,7 +375,6 @@
         <canvas id="chartCanvas"></canvas>
       </div>
 
-      <!-- segundo gráfico multivariable -->
       <div id="chartMultiStatus" class="status">
         ⚠️ Aún no hay datos para el gráfico multivariable. Ejecuta un análisis compatible.
       </div>
@@ -395,31 +383,21 @@
       </div>
     </div>
   </div>
-  <!-- Lógica: CSV + análisis interno + backend section6 + gráficos + PDF -->
+
   <script>
-    // ============================================================
-    //  Backend Section6 (FastAPI) para sección 6
-    //  CAMBIO CLAVE: ahora usamos /build_section6 (no /generate_answer)
-    // ============================================================
     const BACKEND_URL = "https://alexacido-consumertec-llm.hf.space/build_section6";
 
-    // -------------------------------------------------------------
-    // Estado global
-    // -------------------------------------------------------------
     let csvFile = null;
     let csvHeaders = null;
-    let analysisMode = null;       // 'comparaciones', 'whiteness', 'resumen', 'response_rel'
-    let currentPromptKey = null;   // identifica el prompt específico
+    let analysisMode = null;
+    let currentPromptKey = null;
 
-    // estado gráfico
     let chartInstance = null;
     let lastChartData = null;
 
-    // estado gráfico multivariable
     let chartInstanceMulti = null;
     let lastChartDataMulti = null;
 
-    // Tipos de análisis detectados como compatibles
     const tiposDisponibles = {
       comparaciones: false,
       whiteness: false,
@@ -1289,12 +1267,34 @@ function analizarBlancura(statusEl, numericEl, textEl, userPrompt) {
 }
 
 // -------------------------------------------------------------
-// Modo 3: Resumen (payload estructurado básico)
+// Modo 3: Resumen (payload estructurado + EXTRA: top categorías, rangos numéricos, cardinalidad)
 // -------------------------------------------------------------
 function analizarResumen(statusEl, numericEl, textEl, userPrompt) {
   const stats = {};
   let totalFilas = 0;
   let headersLocal = null;
+
+  // === NUEVO (Sección 5 extra) ===
+  const MAX_UNIQUE_TRACK = 4000;
+  const MAX_CAT_TRACK = 800;
+  const NUMERIC_RATIO = 0.85;
+
+  const uniqueSets = {};
+  const catCounts = {};
+  const numericAgg = {};
+
+  function ensureUnique(col) {
+    if (!uniqueSets[col]) uniqueSets[col] = new Set();
+    return uniqueSets[col];
+  }
+  function ensureCatCounts(col) {
+    if (!catCounts[col]) catCounts[col] = new Map();
+    return catCounts[col];
+  }
+  function ensureNumeric(col) {
+    if (!numericAgg[col]) numericAgg[col] = { n:0, sum:0, min:null, max:null, parsed:0, totalSeen:0 };
+    return numericAgg[col];
+  }
 
   Papa.parse(csvFile, {
     header: true,
@@ -1304,12 +1304,39 @@ function analizarResumen(statusEl, numericEl, textEl, userPrompt) {
     chunk: function(results) {
       const rows = results.data;
       if (!headersLocal) headersLocal = results.meta && results.meta.fields ? results.meta.fields : [];
+
       for (const row of rows) {
         totalFilas++;
+
         for (const col of Object.keys(row)) {
           if (!stats[col]) stats[col] = { nonEmpty: 0 };
-          const v = row[col];
-          if (v !== null && v !== undefined && String(v).trim() !== "") stats[col].nonEmpty++;
+
+          const raw = row[col];
+          const s = (raw === null || raw === undefined) ? "" : String(raw).trim();
+          if (s === "") continue;
+
+          stats[col].nonEmpty++;
+
+          const us = ensureUnique(col);
+          if (us.size < MAX_UNIQUE_TRACK) us.add(s);
+
+          const cm = ensureCatCounts(col);
+          if (cm.has(s)) {
+            cm.set(s, cm.get(s) + 1);
+          } else if (cm.size < MAX_CAT_TRACK) {
+            cm.set(s, 1);
+          }
+
+          const na = ensureNumeric(col);
+          na.totalSeen++;
+          const x = Number(s);
+          if (!Number.isNaN(x) && Number.isFinite(x)) {
+            na.parsed++;
+            na.n++;
+            na.sum += x;
+            na.min = (na.min === null) ? x : Math.min(na.min, x);
+            na.max = (na.max === null) ? x : Math.max(na.max, x);
+          }
         }
       }
     },
@@ -1327,15 +1354,69 @@ function analizarResumen(statusEl, numericEl, textEl, userPrompt) {
       const topDensidad = headersLocal.map(c => ({ col: c, nonEmpty: stats[c]?.nonEmpty || 0 }))
         .sort((a,b)=>b.nonEmpty-a.nonEmpty);
 
+      // === NUEVO: columnas candidatas (para categorías/cardinalidad) ===
+      const candidatos = topDensidad
+        .map(x => {
+          const col = x.col;
+          const nonEmpty = x.nonEmpty || 0;
+          const nonEmptyRatio = totalFilas > 0 ? (nonEmpty / totalFilas) : 0;
+          const uniq = uniqueSets[col] ? uniqueSets[col].size : 0;
+          const cardRatio = totalFilas > 0 ? (uniq / totalFilas) : 0;
+          return { col, nonEmpty, nonEmptyRatio, uniq, cardRatio };
+        })
+        .filter(x =>
+          x.nonEmptyRatio >= 0.20 &&
+          x.uniq >= 2 && x.uniq <= 80 &&
+          x.cardRatio <= 0.60
+        )
+        .sort((a,b)=> b.nonEmpty - a.nonEmpty)
+        .slice(0, 12)
+        .map(x => x.col);
+
+      // === 1) Top categorías (top 5) por columna candidata ===
+      const topCategoriasPorColumna = candidatos.map(col => {
+        const m = catCounts[col] || new Map();
+        const top5 = Array.from(m.entries())
+          .sort((a,b)=> b[1]-a[1])
+          .slice(0, 5)
+          .map(([value,count]) => ({ value, count }));
+        return { col, top5 };
+      });
+
+      // === 2) Rangos numéricos por columnas numéricas ===
+      const rangosNumericos = Object.keys(numericAgg).map(col => {
+        const a = numericAgg[col];
+        const ratio = a.totalSeen > 0 ? (a.parsed / a.totalSeen) : 0;
+        const isNumeric = (ratio >= NUMERIC_RATIO) && (a.n >= 30);
+        if (!isNumeric) return null;
+        const mean = a.n > 0 ? (a.sum / a.n) : 0;
+        return { col, n: a.n, min: a.min, max: a.max, mean: mean };
+      }).filter(Boolean);
+
+      // === 3) Cardinalidad por columnas candidatas ===
+      const cardinalidad = candidatos.map(col => {
+        const uniq = uniqueSets[col] ? uniqueSets[col].size : 0;
+        const nonEmpty = stats[col]?.nonEmpty || 0;
+        const nonEmptyRatio = totalFilas > 0 ? (nonEmpty / totalFilas) : 0;
+        return { col, unique: uniq, nonEmpty, nonEmptyRatio };
+      });
+
+      // Sección 5: texto resumen (mantengo tu estilo, compacto)
       let numTxt = "";
       numTxt += "TABLE SUMMARY\n";
       numTxt += "------------\n";
       numTxt += "Rows: " + totalFilas + "\n";
       numTxt += "Cols: " + numCols + "\n\n";
       numTxt += "Top non-empty columns:\n";
-     topDensidad.slice(0, 20).forEach(x => {
-    numTxt += "  - " + x.col + ": " + x.nonEmpty + "\n";
-});
+      topDensidad.slice(0, 20).forEach(x => {
+        numTxt += "  - " + x.col + ": " + x.nonEmpty + "\n";
+      });
+
+      // Opcional: mini-muestra de extras en Sección 5 (para verificar)
+      numTxt += "\nEXTRA (Prompt 7 ready)\n";
+      numTxt += "----------------------\n";
+      numTxt += "Candidate cols: " + (candidatos.length ? candidatos.join(", ") : "(none)") + "\n";
+      numTxt += "Numeric ranges detected: " + rangosNumericos.length + "\n";
 
       numericEl.textContent = numTxt;
 
@@ -1350,20 +1431,23 @@ function analizarResumen(statusEl, numericEl, textEl, userPrompt) {
 
       prepararDatosGraficoMultivariable(null);
 
+      // ✅ Payload estructurado + extras para Sección 6
       const payload = {
         mode: "resumen",
         prompt_key: currentPromptKey,
         prompt_text: userPrompt,
         totalFilas: totalFilas,
         numCols: numCols,
-        with_titles: true,
-        detail_level: 3,
-        min_words: 1200,
-        topDensidad: topDensidad
+        topDensidad: topDensidad,
+
+        // NUEVO
+        topCategoriasPorColumna: topCategoriasPorColumna,
+        rangosNumericos: rangosNumericos,
+        cardinalidad: cardinalidad
       };
 
       pedirExplicacionDesdeBackendStructured(payload);
-      statusEl.textContent = "✅ Resumen: sección 5 lista. Sección 6 generándose con /build_section6…";
+      statusEl.textContent = "✅ Resumen: sección 5 lista (con extras). Sección 6 generándose con /build_section6…";
     },
     error: function(err) {
       statusEl.textContent = "❌ Error al leer el CSV: " + err;
@@ -1374,7 +1458,6 @@ function analizarResumen(statusEl, numericEl, textEl, userPrompt) {
     }
   });
 }
-
 // -------------------------------------------------------------
 // Modo 4: RESPONSE vs Otras (Prompt 4)
 // ✅ ARREGLO: aquí también generamos gráfico multivariable
